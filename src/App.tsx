@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import type { NavState } from './lib/types';
 import Header from './components/layout/Header';
@@ -13,12 +13,47 @@ import AdminDashboard from './pages/AdminDashboard';
 import SuperAdmin from './pages/SuperAdmin';
 
 function AppContent() {
-  const [nav, setNav] = useState<NavState>({ page: 'home' });
+  const [nav, setNav] = useState<NavState>(() => {
+    // Basic URL parsing for initial load
+    const path = window.location.pathname.split('/').filter(Boolean);
+    if (path[0] === 'browse') return { page: 'browse' };
+    if (path[0] === 'auth') return { page: 'auth' };
+    if (path[0] === 'super-admin') return { page: 'super-admin' };
+    if (path[0] === 'admin-dashboard') return { page: 'admin-dashboard' };
+    if (path[0] === 'dashboard') return { page: 'user-dashboard' };
+    if (path[0] === 'business' && path[1]) return { page: 'business-detail', businessId: path[1] };
+    if (path[0] === 'book' && path[1] && path[2]) return { page: 'booking', businessId: path[1], serviceId: path[2] };
+    return { page: 'home' };
+  });
 
-  const handleNavigate = (state: NavState) => {
+  const handleNavigate = (state: NavState, push = true) => {
     setNav(state);
+    
+    // Update URL
+    if (push) {
+      let url = '/';
+      if (state.page === 'browse') url = '/browse';
+      if (state.page === 'auth') url = '/auth';
+      if (state.page === 'super-admin') url = '/super-admin';
+      if (state.page === 'admin-dashboard') url = '/admin-dashboard';
+      if (state.page === 'user-dashboard') url = '/dashboard';
+      if (state.page === 'business-detail') url = `/business/${state.businessId}`;
+      if (state.page === 'booking') url = `/book/${state.businessId}/${state.serviceId}`;
+      window.history.pushState(state, '', url);
+    }
+    
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state) handleNavigate(e.state, false);
+      else handleNavigate({ page: 'home' }, false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const renderPage = () => {
     switch (nav.page) {
@@ -53,7 +88,7 @@ function AppContent() {
   return (
     <div className="min-h-screen font-sans">
       {showHeader && <Header nav={nav} onNavigate={handleNavigate} />}
-      <main>{renderPage()}</main>
+      <main className="transition-all duration-300">{renderPage()}</main>
       {showFooter && <Footer onNavigate={handleNavigate} />}
     </div>
   );

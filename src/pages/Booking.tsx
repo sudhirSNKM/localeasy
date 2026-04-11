@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Calendar, Clock, CheckCircle, MessageCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ArrowLeft, Calendar, Clock, CheckCircle, MessageCircle, IndianRupee } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import type { Business, Service, NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
 
 interface BookingProps {
   businessId: string;
@@ -12,7 +12,11 @@ interface BookingProps {
   onNavigate: (state: NavState) => void;
 }
 
-const TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'];
+const TIME_SLOTS = [
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '13:00', '13:30', '14:00', '14:30',
+  '15:00', '15:30', '16:00', '16:30', '17:00'
+];
 
 export default function Booking({ businessId, serviceId, onNavigate }: BookingProps) {
   const { user } = useAuth();
@@ -22,18 +26,29 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
   const [timeSlot, setTimeSlot] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!user) { onNavigate({ page: 'auth' }); return; }
-    Promise.all([
-      supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
-      supabase.from('services').select('*').eq('id', serviceId).maybeSingle(),
-    ]).then(([biz, svc]) => {
-      setBusiness(biz.data);
-      setService(svc.data);
-    });
+
+    const loadData = async () => {
+      try {
+        const [bizSnap, svcSnap] = await Promise.all([
+          getDoc(doc(db, 'businesses', businessId)),
+          getDoc(doc(db, 'services', serviceId))
+        ]);
+        if (bizSnap.exists()) setBusiness({ id: bizSnap.id, ...bizSnap.data() } as Business);
+        if (svcSnap.exists()) setService({ id: svcSnap.id, ...svcSnap.data() } as Service);
+      } catch (err) {
+        console.error('Error loading booking data:', err);
+      } finally {
+        setPageLoading(false);
+      }
+    };
+
+    loadData();
   }, [businessId, serviceId, user]);
 
   const minDate = new Date();
@@ -48,19 +63,29 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
     setLoading(true);
     setError('');
 
-    const { error: err } = await supabase.from('bookings').insert({
-      user_id: user.id,
-      business_id: businessId,
-      service_id: serviceId,
-      date,
-      time_slot: timeSlot,
-      notes,
-      status: 'pending',
-    });
-
-    setLoading(false);
-    if (err) { setError(err.message); return; }
-    setSuccess(true);
+    try {
+      await addDoc(collection(db, 'bookings'), {
+        user_id: user.uid,
+        user_name: user.displayName || user.email?.split('@')[0] || 'Customer',
+        business_id: businessId,
+        service_id: serviceId,
+        service_name: service.name,
+        business_name: business.name,
+        business_whatsapp: business.whatsapp,
+        price: service.price,
+        date,
+        time: timeSlot,
+        time_slot: timeSlot,
+        notes,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create booking');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleWhatsApp = () => {
@@ -71,23 +96,30 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
     window.open(`https://wa.me/${business.whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
   };
 
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent animate-spin rounded-full" />
+      </div>
+    );
+  }
+
   if (success) {
     return (
-      <div className="min-h-screen bg-neutral-50 pt-20 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-card p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-accent-500" />
+      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={32} className="text-green-600" />
           </div>
-          <h2 className="text-xl font-bold text-neutral-900 mb-2">Booking Confirmed!</h2>
-          <p className="text-neutral-500 text-sm mb-6">
-            Your booking for <strong>{service?.name}</strong> at <strong>{business?.name}</strong> on {new Date(date).toLocaleDateString()} at {timeSlot} has been submitted.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Your booking for <strong>{service?.name}</strong> at <strong>{business?.name}</strong> on{' '}
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {timeSlot} has been submitted.
           </p>
-          <p className="text-neutral-400 text-xs mb-6">The business will confirm your appointment shortly.</p>
           <div className="flex flex-col gap-3">
             {business?.whatsapp && (
               <Button onClick={handleWhatsApp} variant="success" fullWidth>
-                <MessageCircle size={16} />
-                Confirm via WhatsApp
+                <MessageCircle size={16} /> Confirm via WhatsApp
               </Button>
             )}
             <Button onClick={() => onNavigate({ page: 'user-dashboard' })} variant="outline" fullWidth>
@@ -103,33 +135,35 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 pt-20 pb-12">
+    <div className="min-h-screen bg-gray-50 pt-20 pb-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         <button
           onClick={() => onNavigate({ page: 'business-detail', businessId })}
-          className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-900 mb-6 mt-4 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 mb-6 mt-4 transition-colors"
         >
           <ArrowLeft size={16} /> Back to Business
         </button>
 
-        <h1 className="text-2xl font-bold text-neutral-900 mb-2">Book Appointment</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Book Appointment</h1>
 
         {service && business && (
-          <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 mb-6 flex items-center gap-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex items-center gap-4">
             <div className="flex-1">
-              <div className="text-xs text-primary-600 font-medium mb-1">{business.name}</div>
-              <div className="font-semibold text-neutral-900">{service.name}</div>
-              <div className="flex items-center gap-3 text-sm text-neutral-500 mt-1">
+              <div className="text-xs text-blue-600 font-semibold mb-1 uppercase tracking-wider">{business.name}</div>
+              <div className="font-bold text-gray-900 text-lg">{service.name}</div>
+              <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                 <span className="flex items-center gap-1"><Clock size={13} />{service.duration} min</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-primary-600">${service.price.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-blue-600 flex items-center gap-1">
+              <IndianRupee size={20} />{service.price}
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-card p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               <Calendar size={14} className="inline mr-1.5" />
               Select Date
             </label>
@@ -139,12 +173,12 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
               onChange={e => setDate(e.target.value)}
               min={minDateStr}
               required
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-3">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
               <Clock size={14} className="inline mr-1.5" />
               Select Time Slot
             </label>
@@ -154,10 +188,10 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
                   key={slot}
                   type="button"
                   onClick={() => setTimeSlot(slot)}
-                  className={`py-2 text-sm rounded-lg border transition-all font-medium ${
+                  className={`py-2 text-sm rounded-xl border-2 transition-all font-medium ${
                     timeSlot === slot
-                      ? 'border-primary-500 bg-primary-600 text-white'
-                      : 'border-neutral-200 text-neutral-700 hover:border-primary-300 hover:bg-primary-50'
+                      ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                      : 'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
                   }`}
                 >
                   {slot}
@@ -167,17 +201,19 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Notes (optional)</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Notes (optional)</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Any special requests or information..."
               rows={3}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
 
-          {error && <p className="text-error-500 text-sm bg-error-50 px-4 py-2.5 rounded-lg">{error}</p>}
+          {error && (
+            <p className="text-red-600 text-sm bg-red-50 px-4 py-2.5 rounded-xl border border-red-100">{error}</p>
+          )}
 
           <Button type="submit" loading={loading} fullWidth size="lg">
             Confirm Booking
@@ -185,8 +221,7 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
 
           {business?.whatsapp && (
             <Button type="button" onClick={handleWhatsApp} variant="success" fullWidth>
-              <MessageCircle size={16} />
-              Book via WhatsApp Instead
+              <MessageCircle size={16} /> Book via WhatsApp Instead
             </Button>
           )}
         </form>

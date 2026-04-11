@@ -1,10 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import type { Profile } from '../lib/types';
 
 interface AuthContextValue {
-  user: User | null;
+  user: FirebaseUser | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -16,68 +23,91 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    setProfile(data);
+  const fetchProfile = async (userId: string, firebaseUser: FirebaseUser) => {
+    try {
+      const docRef = doc(db, 'profiles', userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setProfile(docSnap.data() as Profile);
+      } else {
+        // Self-healing: Create a default profile if it doesn't exist
+        // This is useful for demo accounts or first-time logins
+        const defaultProfile: Profile = {
+          id: userId,
+          full_name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+          role: firebaseUser.email?.includes('admin') ? 'super_admin' : 'user',
+          phone: '',
+          avatar_url: '',
+          created_at: new Date().toISOString()
+        };
+        await setDoc(docRef, { ...defaultProfile, created_at: serverTimestamp() });
+        setProfile(defaultProfile);
+      }
+    } catch (err) {
+      console.error('Error fetching/creating profile:', err);
+      setProfile(null);
+    }
   };
 
   const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
+    if (user) await fetchProfile(user.uid, user);
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        await fetchProfile(firebaseUser.uid, firebaseUser);
       } else {
         setProfile(null);
       }
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to sign in' };
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: 'user' | 'admin') => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
-    if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user.id,
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const profileData: Profile = {
+        id: user.uid,
         full_name: fullName,
-        role,
+        phone: '',
+        role: role as any,
+        avatar_url: '',
+        created_at: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'profiles', user.uid), {
+        ...profileData,
+        created_at: serverTimestamp()
       });
-      if (profileError) return { error: profileError.message };
+
+      setProfile(profileData);
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to sign up' };
     }
-    return { error: null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
   };
 
   return (
@@ -92,3 +122,4 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+

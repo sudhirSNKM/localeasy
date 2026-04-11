@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Building2, Plus, CreditCard as Edit2, Trash2, Tag, Calendar, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import type { Business, Service, Promotion, Booking, Category, NavState } from '../lib/types';
+import { Building2, Plus, Edit2, Trash2, Star, TrendingUp, Calendar, Briefcase, MessageSquare, IndianRupee, Clock, MapPin, Phone, Megaphone } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import type { Business, Service, Promotion, Category, NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
 
 interface AdminDashboardProps {
   onNavigate: (state: NavState) => void;
@@ -14,417 +13,511 @@ interface AdminDashboardProps {
 
 type Tab = 'overview' | 'business' | 'services' | 'promotions' | 'bookings';
 
-const statusConfig = {
-  pending: { variant: 'warning' as const, icon: <AlertCircle size={12} />, label: 'Pending' },
-  confirmed: { variant: 'info' as const, icon: <CheckCircle size={12} />, label: 'Confirmed' },
-  completed: { variant: 'success' as const, icon: <CheckCircle size={12} />, label: 'Completed' },
-  cancelled: { variant: 'error' as const, icon: <XCircle size={12} />, label: 'Cancelled' },
-};
-
 export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const { user, profile } = useAuth();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [business, setBusiness] = useState<Business | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [bookings, setBookings] = useState<(Booking & { services: Pick<Service, 'name' | 'price'>; profiles: { full_name: string } | null })[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [showBizModal, setShowBizModal] = useState(false);
   const [showSvcModal, setShowSvcModal] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [editSvc, setEditSvc] = useState<Service | null>(null);
   const [editPromo, setEditPromo] = useState<Promotion | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  const [bizForm, setBizForm] = useState({ name: '', description: '', category_id: '', address: '', city: '', phone: '', whatsapp: '', cover_url: '' });
+  const [bizForm, setBizForm] = useState({ name: '', description: '', category_id: '', address: '', city: '', phone: '', whatsapp: '' });
   const [svcForm, setSvcForm] = useState({ name: '', description: '', price: '', duration: '60' });
   const [promoForm, setPromoForm] = useState({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' });
 
   useEffect(() => {
-    if (!user || profile?.role === 'user') { onNavigate({ page: 'home' }); return; }
-    load();
+    if (!user) { onNavigate({ page: 'auth' }); return; }
+    // If profile loaded AND is a regular user (not admin/super_admin), redirect home
+    if (profile && profile.role === 'user') {
+      onNavigate({ page: 'home' });
+      return;
+    }
+    // Super admin should go to their own console
+    if (profile && profile.role === 'super_admin') {
+      onNavigate({ page: 'super-admin' });
+      return;
+    }
+
+    const qBiz = query(collection(db, 'businesses'), where('owner_id', '==', user.uid));
+    let unsubSvcs: (() => void) | null = null;
+    let unsubPromos: (() => void) | null = null;
+    let unsubBkgs: (() => void) | null = null;
+
+    const unsubBiz = onSnapshot(qBiz, (snapshot) => {
+      if (!snapshot.empty) {
+        const bizData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Business;
+        setBusiness(bizData);
+        setBizForm(prev => ({ ...prev, ...bizData }));
+        setLoading(false);
+
+        unsubSvcs = onSnapshot(query(collection(db, 'services'), where('business_id', '==', bizData.id)), (s) => {
+          setServices(s.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+        });
+        unsubPromos = onSnapshot(query(collection(db, 'promotions'), where('business_id', '==', bizData.id)), (s) => {
+          setPromotions(s.docs.map(d => ({ id: d.id, ...d.data() } as Promotion)));
+        });
+        unsubBkgs = onSnapshot(query(collection(db, 'bookings'), where('business_id', '==', bizData.id)), (s) => {
+          setBookings(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+      } else {
+        setBusiness(null);
+        setLoading(false);
+      }
+    }, (err) => {
+      console.error('Business snapshot error:', err);
+      setLoading(false);
+    });
+
+    // Load categories without orderBy (client-side sort)
+    getDocs(collection(db, 'categories')).then(snapshot => {
+      const cats = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+      cats.sort((a, b) => a.name.localeCompare(b.name));
+      setCategories(cats);
+    });
+
+    return () => {
+      unsubBiz();
+      if (unsubSvcs) unsubSvcs();
+      if (unsubPromos) unsubPromos();
+      if (unsubBkgs) unsubBkgs();
+    };
   }, [user, profile]);
 
-  const load = async () => {
-    setLoading(true);
-    const [cats, biz] = await Promise.all([
-      supabase.from('categories').select('*'),
-      supabase.from('businesses').select('*').eq('owner_id', user!.id).maybeSingle(),
-    ]);
-    setCategories(cats.data || []);
-    const bizData = biz.data;
-    setBusiness(bizData);
-
-    if (bizData) {
-      setBizForm({ name: bizData.name, description: bizData.description, category_id: bizData.category_id || '', address: bizData.address, city: bizData.city, phone: bizData.phone, whatsapp: bizData.whatsapp, cover_url: bizData.cover_url });
-      const [svcs, promos, bkgs] = await Promise.all([
-        supabase.from('services').select('*').eq('business_id', bizData.id),
-        supabase.from('promotions').select('*').eq('business_id', bizData.id),
-        supabase.from('bookings').select('*, services(name, price), profiles(full_name)').eq('business_id', bizData.id).order('created_at', { ascending: false }),
-      ]);
-      setServices(svcs.data || []);
-      setPromotions(promos.data || []);
-      setBookings((bkgs.data as any) || []);
-    }
-    setLoading(false);
-  };
-
   const saveBusiness = async () => {
+    if (!user) return;
     setSaving(true);
-    if (business) {
-      await supabase.from('businesses').update(bizForm).eq('id', business.id);
-    } else {
-      await supabase.from('businesses').insert({ ...bizForm, owner_id: user!.id });
+    try {
+      if (business) {
+        await updateDoc(doc(db, 'businesses', business.id), bizForm);
+      } else {
+        await addDoc(collection(db, 'businesses'), {
+          ...bizForm,
+          owner_id: user.uid,
+          status: 'pending',
+          rating: 5.0,
+          review_count: 0,
+          created_at: new Date().toISOString()
+        });
+        // Upgrade to admin role
+        await updateDoc(doc(db, 'profiles', user.uid), { role: 'admin' });
+      }
+      setShowBizModal(false);
+    } catch (err: any) {
+      alert('Error saving business: ' + err.message);
+    } finally {
+      setSaving(false);
     }
-    await load();
-    setShowBizModal(false);
-    setSaving(false);
   };
 
   const saveService = async () => {
     if (!business) return;
     setSaving(true);
-    const data = { ...svcForm, price: parseFloat(svcForm.price) || 0, duration: parseInt(svcForm.duration) || 60, business_id: business.id };
-    if (editSvc) {
-      await supabase.from('services').update(data).eq('id', editSvc.id);
-    } else {
-      await supabase.from('services').insert(data);
+    const data = {
+      name: svcForm.name,
+      description: svcForm.description,
+      price: parseFloat(svcForm.price) || 0,
+      duration: parseInt(svcForm.duration) || 60,
+      business_id: business.id,
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+    try {
+      if (editSvc) {
+        await updateDoc(doc(db, 'services', editSvc.id), data);
+      } else {
+        await addDoc(collection(db, 'services'), data);
+      }
+      setShowSvcModal(false);
+      setSvcForm({ name: '', description: '', price: '', duration: '60' });
+      setEditSvc(null);
+    } catch (err: any) {
+      alert('Error saving service: ' + err.message);
+    } finally {
+      setSaving(false);
     }
-    const { data: svcs } = await supabase.from('services').select('*').eq('business_id', business.id);
-    setServices(svcs || []);
-    setShowSvcModal(false);
-    setSvcForm({ name: '', description: '', price: '', duration: '60' });
-    setEditSvc(null);
-    setSaving(false);
+  };
+
+  const savePromotion = async () => {
+    if (!business) return;
+    setSaving(true);
+    const data = {
+      title: promoForm.title,
+      description: promoForm.description,
+      discount_pct: parseInt(promoForm.discount_pct) || 10,
+      start_date: promoForm.start_date || new Date().toISOString(),
+      end_date: promoForm.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      business_id: business.id,
+      status: 'active',
+      image_url: business.cover_url || '',
+      created_at: new Date().toISOString()
+    };
+    try {
+      if (editPromo) {
+        await updateDoc(doc(db, 'promotions', editPromo.id), data);
+      } else {
+        await addDoc(collection(db, 'promotions'), data);
+      }
+      setShowPromoModal(false);
+      setPromoForm({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' });
+      setEditPromo(null);
+    } catch (err: any) {
+      alert('Error saving promotion: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteService = async (id: string) => {
-    await supabase.from('services').delete().eq('id', id);
-    setServices(prev => prev.filter(s => s.id !== id));
+    if (!window.confirm('Delete this service?')) return;
+    try { await deleteDoc(doc(db, 'services', id)); }
+    catch (err: any) { alert('Error: ' + err.message); }
   };
 
-  const savePromo = async () => {
-    if (!business) return;
-    setSaving(true);
-    const data = { ...promoForm, discount_pct: parseInt(promoForm.discount_pct) || 0, business_id: business.id };
-    if (editPromo) {
-      await supabase.from('promotions').update(data).eq('id', editPromo.id);
-    } else {
-      await supabase.from('promotions').insert(data);
-    }
-    const { data: promos } = await supabase.from('promotions').select('*').eq('business_id', business.id);
-    setPromotions(promos || []);
-    setShowPromoModal(false);
-    setPromoForm({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' });
-    setEditPromo(null);
-    setSaving(false);
+  const deletePromotion = async (id: string) => {
+    if (!window.confirm('Delete this promotion?')) return;
+    try { await deleteDoc(doc(db, 'promotions', id)); }
+    catch (err: any) { alert('Error: ' + err.message); }
   };
 
   const updateBookingStatus = async (id: string, status: string) => {
-    await supabase.from('bookings').update({ status }).eq('id', id);
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: status as any } : b));
+    try { await updateDoc(doc(db, 'bookings', id), { status }); }
+    catch (err: any) { alert('Error: ' + err.message); }
   };
-
-  const openEditSvc = (svc: Service) => {
-    setEditSvc(svc);
-    setSvcForm({ name: svc.name, description: svc.description, price: svc.price.toString(), duration: svc.duration.toString() });
-    setShowSvcModal(true);
-  };
-
-  const openEditPromo = (promo: Promotion) => {
-    setEditPromo(promo);
-    setPromoForm({ title: promo.title, description: promo.description, discount_pct: promo.discount_pct.toString(), start_date: promo.start_date, end_date: promo.end_date });
-    setShowPromoModal(true);
-  };
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'business', label: 'Business' },
-    { key: 'services', label: `Services (${services.length})` },
-    { key: 'promotions', label: `Promotions (${promotions.length})` },
-    { key: 'bookings', label: `Bookings (${bookings.length})` },
-  ];
 
   if (loading) {
-    return <div className="min-h-screen pt-20 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent" /></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent animate-spin rounded-full" />
+      </div>
+    );
   }
 
+  const tabs: Tab[] = ['overview', 'business', 'services', 'promotions', 'bookings'];
+
   return (
-    <div className="min-h-screen bg-neutral-50 pt-20 pb-12">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="mt-6 mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 pt-20 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Business Dashboard</h1>
-            <p className="text-neutral-500 mt-1">{business?.name || 'Set up your business to get started'}</p>
+            <h1 className="text-2xl font-bold text-gray-900">Business Dashboard</h1>
+            <p className="text-gray-500 text-sm mt-0.5">{business?.name || 'Set up your business profile'}</p>
           </div>
           {business && (
-            <Badge variant={business.status === 'approved' ? 'success' : business.status === 'pending' ? 'warning' : 'error'}>
-              {business.status === 'approved' ? 'Live' : business.status === 'pending' ? 'Under Review' : 'Rejected'}
+            <Badge variant={business.status === 'approved' ? 'success' : business.status === 'rejected' ? 'error' : 'warning'}>
+              {business.status === 'approved' ? '✓ Live' : business.status === 'rejected' ? '✗ Rejected' : '⏳ Pending'}
             </Badge>
           )}
         </div>
 
-        <div className="overflow-x-auto mb-6">
-          <div className="flex gap-1 bg-neutral-100 rounded-xl p-1 w-fit min-w-full sm:min-w-0">
-            {tabs.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab === t.key ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        {/* Tabs */}
+        <div className="flex overflow-x-auto pb-1 gap-1 mb-8 bg-gray-200/60 p-1 rounded-2xl w-fit">
+          {tabs.map(t => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={`px-5 py-2 rounded-xl text-sm font-semibold capitalize transition-all whitespace-nowrap ${
+                activeTab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t === 'bookings' ? `Bookings (${bookings.length})` : t === 'services' ? `Services (${services.length})` : t === 'promotions' ? `Promotions (${promotions.length})` : t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
         </div>
 
-        {tab === 'overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Services', value: services.length, icon: <Building2 size={18} className="text-primary-500" /> },
-                { label: 'Active Promos', value: promotions.filter(p => p.status === 'active').length, icon: <Tag size={18} className="text-secondary-500" /> },
-                { label: 'Total Bookings', value: bookings.length, icon: <Calendar size={18} className="text-accent-500" /> },
-                { label: 'Pending', value: bookings.filter(b => b.status === 'pending').length, icon: <Clock size={18} className="text-warning-500" /> },
-              ].map(stat => (
-                <div key={stat.label} className="bg-white rounded-xl shadow-card p-5">
-                  <div className="flex items-center gap-2 mb-2">{stat.icon}<span className="text-xs text-neutral-500">{stat.label}</span></div>
-                  <div className="text-3xl font-bold text-neutral-900">{stat.value}</div>
-                </div>
-              ))}
+        {/* No Business CTA */}
+        {!business ? (
+          <div className="bg-white rounded-3xl p-12 text-center shadow-sm border border-gray-100">
+            <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Building2 size={40} className="text-blue-600" />
             </div>
-
-            {!business && (
-              <div className="bg-primary-50 border border-primary-200 rounded-2xl p-8 text-center">
-                <Building2 size={36} className="text-primary-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">Create Your Business Profile</h3>
-                <p className="text-neutral-500 text-sm mb-4">Set up your business to start accepting bookings from customers.</p>
-                <Button onClick={() => { setTab('business'); setShowBizModal(true); }}>Create Business Profile</Button>
-              </div>
-            )}
-
-            {business?.status === 'pending' && (
-              <div className="bg-secondary-50 border border-secondary-200 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle size={18} className="text-secondary-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-secondary-800">Your business is under review</p>
-                  <p className="text-xs text-secondary-600 mt-0.5">An admin will review and approve your business shortly. You'll receive a confirmation once it's live.</p>
-                </div>
-              </div>
-            )}
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Grow your business with LocalEase</h2>
+            <p className="text-gray-500 mb-8 max-w-sm mx-auto text-sm">
+              List your services, manage bookings, and reach thousands of local customers. Your listing will be reviewed before going live.
+            </p>
+            <Button size="lg" onClick={() => setShowBizModal(true)}>List My Business</Button>
           </div>
-        )}
+        ) : (
+          <div className="space-y-6">
 
-        {tab === 'business' && (
-          <div className="bg-white rounded-2xl shadow-card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-neutral-900">Business Profile</h2>
-              <Button size="sm" onClick={() => setShowBizModal(true)}>
-                <Edit2 size={14} /> {business ? 'Edit' : 'Create'}
-              </Button>
-            </div>
-            {business ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* OVERVIEW TAB */}
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  ['Business Name', business.name], ['City', business.city], ['Address', business.address],
-                  ['Phone', business.phone], ['WhatsApp', business.whatsapp], ['Status', business.status],
-                ].map(([label, val]) => (
-                  <div key={label} className="p-4 bg-neutral-50 rounded-xl">
-                    <div className="text-xs text-neutral-400 uppercase tracking-wide mb-1">{label}</div>
-                    <div className="text-sm font-medium text-neutral-900 capitalize">{val || '—'}</div>
+                  { label: 'Services', value: services.length, icon: <Briefcase size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Bookings', value: bookings.length, icon: <Calendar size={20} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                  { label: 'Rating', value: business.rating?.toFixed(1) || '—', icon: <Star size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { label: 'Promotions', value: promotions.length, icon: <Megaphone size={20} />, color: 'text-green-600', bg: 'bg-green-50' }
+                ].map(stat => (
+                  <div key={stat.label} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-4`}>{stat.icon}</div>
+                    <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
+                    <div className="text-sm font-medium text-gray-400 mt-1">{stat.label}</div>
                   </div>
                 ))}
-                {business.description && (
-                  <div className="sm:col-span-2 p-4 bg-neutral-50 rounded-xl">
-                    <div className="text-xs text-neutral-400 uppercase tracking-wide mb-1">Description</div>
-                    <div className="text-sm text-neutral-900">{business.description}</div>
+
+                {bookings.length > 0 && (
+                  <div className="col-span-2 lg:col-span-4 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-bold text-gray-900 mb-4">Recent Bookings</h3>
+                    <div className="space-y-3">
+                      {bookings.slice(0, 3).map(b => (
+                        <div key={b.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">{b.user_name || 'Customer'} — {b.service_name}</div>
+                            <div className="text-xs text-gray-400">{b.date} at {b.time || b.time_slot}</div>
+                          </div>
+                          <Badge variant={b.status === 'confirmed' || b.status === 'completed' ? 'success' : 'warning'}>{b.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
-              <p className="text-neutral-500 text-sm">No business profile yet. Click "Create" to get started.</p>
+            )}
+
+            {/* BUSINESS TAB */}
+            {activeTab === 'business' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Profile Information</h3>
+                    <button onClick={() => setShowBizModal(true)} className="text-blue-600 hover:text-blue-700 font-semibold text-sm">Edit</button>
+                  </div>
+                  <div className="space-y-5">
+                    <div className="flex items-start gap-3">
+                      <Building2 size={18} className="text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Business Name</div>
+                        <div className="font-bold text-gray-900">{business.name}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <MapPin size={18} className="text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">City</div>
+                        <div className="font-semibold text-gray-900">{business.city || '—'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Phone size={18} className="text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">WhatsApp</div>
+                        <div className="font-semibold text-gray-900">{business.whatsapp || '—'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">About</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{business.description || 'No description provided.'}</p>
+                  <div className="mt-6 pt-6 border-t border-gray-50">
+                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</div>
+                    <Badge variant={business.status === 'approved' ? 'success' : business.status === 'rejected' ? 'error' : 'warning'}>
+                      {business.status === 'approved' ? 'Live & Visible' : business.status === 'rejected' ? 'Rejected by admin' : 'Waiting for approval'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SERVICES TAB */}
+            {activeTab === 'services' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                  <h3 className="font-bold text-gray-900">Your Services</h3>
+                  <Button size="sm" onClick={() => { setEditSvc(null); setSvcForm({ name: '', description: '', price: '', duration: '60' }); setShowSvcModal(true); }}>
+                    <Plus size={14} /> Add Service
+                  </Button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {services.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <Briefcase size={32} className="text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-400 text-sm">No services added yet.</p>
+                    </div>
+                  ) : (
+                    services.map(svc => (
+                      <div key={svc.id} className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <div>
+                          <h4 className="font-bold text-gray-900">{svc.name}</h4>
+                          <div className="flex items-center gap-3 mt-1 text-xs font-semibold text-gray-400">
+                            <span className="flex items-center gap-1 text-blue-600"><IndianRupee size={12} />{svc.price}</span>
+                            <span className="flex items-center gap-1"><Clock size={12} />{svc.duration} mins</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => { setEditSvc(svc); setSvcForm({ name: svc.name, description: svc.description || '', price: svc.price.toString(), duration: svc.duration.toString() }); setShowSvcModal(true); }} className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"><Edit2 size={15} /></button>
+                          <button onClick={() => deleteService(svc.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={15} /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PROMOTIONS TAB */}
+            {activeTab === 'promotions' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                  <h3 className="font-bold text-gray-900">Promotions & Offers</h3>
+                  <Button size="sm" variant="accent" onClick={() => { setEditPromo(null); setPromoForm({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' }); setShowPromoModal(true); }}>
+                    <Plus size={14} /> Add Offer
+                  </Button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {promotions.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <Megaphone size={32} className="text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-400 text-sm">No promotional offers yet.</p>
+                    </div>
+                  ) : (
+                    promotions.map(promo => (
+                      <div key={promo.id} className="p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-gray-900">{promo.title}</h4>
+                            <Badge variant="accent">{promo.discount_pct}% OFF</Badge>
+                          </div>
+                          <p className="text-sm text-gray-400">{promo.description}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => { setEditPromo(promo); setPromoForm({ title: promo.title, description: promo.description, discount_pct: promo.discount_pct.toString(), start_date: promo.start_date || '', end_date: promo.end_date || '' }); setShowPromoModal(true); }} className="p-2 text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"><Edit2 size={15} /></button>
+                          <button onClick={() => deletePromotion(promo.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={15} /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* BOOKINGS TAB */}
+            {activeTab === 'bookings' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+                  <h3 className="font-bold text-gray-900">Appointment Bookings</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {bookings.length === 0 ? (
+                    <div className="p-16 text-center text-gray-400 text-sm">No bookings yet.</div>
+                  ) : (
+                    bookings.map(b => (
+                      <div key={b.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex gap-4">
+                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 font-bold text-sm shrink-0">
+                            {(b.user_name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900 text-sm">{b.user_name || 'Customer'}</div>
+                            <div className="text-sm text-blue-600 font-semibold">{b.service_name}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">{b.date} • {b.time || b.time_slot}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {b.status === 'pending' && (
+                            <Button size="sm" onClick={() => updateBookingStatus(b.id, 'confirmed')}>Confirm</Button>
+                          )}
+                          {b.status === 'confirmed' && (
+                            <Button size="sm" variant="success" onClick={() => updateBookingStatus(b.id, 'completed')}>Done</Button>
+                          )}
+                          <Badge variant={b.status === 'confirmed' || b.status === 'completed' ? 'success' : b.status === 'cancelled' ? 'error' : 'warning'}>{b.status}</Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {tab === 'services' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-neutral-900">Services</h2>
-              {business && <Button size="sm" onClick={() => { setEditSvc(null); setSvcForm({ name: '', description: '', price: '', duration: '60' }); setShowSvcModal(true); }}><Plus size={14} /> Add Service</Button>}
-            </div>
-            <div className="space-y-3">
-              {services.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-xl shadow-card">
-                  <p className="text-neutral-500 text-sm">{business ? 'No services yet. Add your first service.' : 'Create a business first.'}</p>
-                </div>
-              ) : services.map(svc => (
-                <div key={svc.id} className="bg-white rounded-xl shadow-card p-5 flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-neutral-900">{svc.name}</h3>
-                      {!svc.is_active && <Badge variant="default">Inactive</Badge>}
-                    </div>
-                    <p className="text-neutral-500 text-sm">{svc.description}</p>
-                    <div className="flex gap-3 text-xs text-neutral-400 mt-1">
-                      <span><Clock size={11} className="inline mr-0.5" />{svc.duration} min</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-neutral-900 mb-2">${svc.price.toFixed(2)}</div>
-                    <div className="flex gap-2">
-                      <button onClick={() => openEditSvc(svc)} className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
-                      <button onClick={() => deleteService(svc.id)} className="p-1.5 text-neutral-400 hover:text-error-500 hover:bg-error-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'promotions' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-neutral-900">Promotions</h2>
-              {business && <Button size="sm" onClick={() => { setEditPromo(null); setPromoForm({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' }); setShowPromoModal(true); }}><Plus size={14} /> Add Promo</Button>}
-            </div>
-            <div className="space-y-3">
-              {promotions.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-xl shadow-card">
-                  <p className="text-neutral-500 text-sm">{business ? 'No promotions yet.' : 'Create a business first.'}</p>
-                </div>
-              ) : promotions.map(promo => (
-                <div key={promo.id} className="bg-white rounded-xl shadow-card p-5 flex items-center gap-4">
-                  <div className="w-14 h-14 bg-secondary-100 rounded-xl flex items-center justify-center text-secondary-700 font-bold text-lg flex-shrink-0">
-                    {promo.discount_pct}%
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-neutral-900 mb-0.5">{promo.title}</h3>
-                    <p className="text-neutral-500 text-sm">{promo.description}</p>
-                    <p className="text-xs text-neutral-400 mt-1">{promo.start_date} → {promo.end_date}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <Badge variant={promo.status === 'active' ? 'success' : 'default'}>{promo.status}</Badge>
-                    <div className="flex gap-2">
-                      <button onClick={() => openEditPromo(promo)} className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'bookings' && (
-          <div className="space-y-3">
-            {bookings.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl shadow-card">
-                <p className="text-neutral-500 text-sm">No bookings yet.</p>
+        {/* BUSINESS MODAL */}
+        {showBizModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+              <div className="p-6 border-b border-gray-100">
+                <h3 className="text-xl font-bold text-gray-900">{business ? 'Update Business' : 'List Your Business'}</h3>
+                <p className="text-gray-500 text-sm mt-1">Fill in your details. Your listing will be reviewed before going live.</p>
               </div>
-            ) : bookings.map((booking: any) => {
-              const sc = statusConfig[booking.status as keyof typeof statusConfig];
-              return (
-                <div key={booking.id} className="bg-white rounded-xl shadow-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={sc.variant}><span className="flex items-center gap-1">{sc.icon}{sc.label}</span></Badge>
-                    </div>
-                    <h3 className="font-semibold text-neutral-900">{booking.services.name}</h3>
-                    <p className="text-neutral-500 text-sm">{booking.profiles?.full_name || 'Customer'}</p>
-                    <div className="flex gap-3 text-xs text-neutral-400 mt-1">
-                      <span><Calendar size={11} className="inline mr-0.5" />{booking.date}</span>
-                      <span><Clock size={11} className="inline mr-0.5" />{booking.time_slot}</span>
-                    </div>
-                    {booking.notes && <p className="text-xs text-neutral-400 italic mt-1">"{booking.notes}"</p>}
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="font-bold text-neutral-900">${booking.services.price.toFixed(2)}</span>
-                    {booking.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="success" onClick={() => updateBookingStatus(booking.id, 'confirmed')}>Confirm</Button>
-                        <Button size="sm" variant="danger" onClick={() => updateBookingStatus(booking.id, 'cancelled')}>Decline</Button>
-                      </div>
-                    )}
-                    {booking.status === 'confirmed' && (
-                      <Button size="sm" onClick={() => updateBookingStatus(booking.id, 'completed')}>Mark Done</Button>
-                    )}
-                  </div>
+              <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+                <input value={bizForm.name} onChange={e => setBizForm({ ...bizForm, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Business Name *" />
+                <select value={bizForm.category_id} onChange={e => setBizForm({ ...bizForm, category_id: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Select Category</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <textarea value={bizForm.description} onChange={e => setBizForm({ ...bizForm, description: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Business description..." rows={3} />
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={bizForm.city} onChange={e => setBizForm({ ...bizForm, city: e.target.value })} className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="City *" />
+                  <input value={bizForm.phone} onChange={e => setBizForm({ ...bizForm, phone: e.target.value })} className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Phone Number" />
                 </div>
-              );
-            })}
+                <input value={bizForm.whatsapp} onChange={e => setBizForm({ ...bizForm, whatsapp: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="WhatsApp Number (e.g. 919999988888)" />
+                <input value={bizForm.address} onChange={e => setBizForm({ ...bizForm, address: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Full Address" />
+              </div>
+              <div className="p-6 bg-gray-50/50 flex gap-3">
+                <Button onClick={saveBusiness} loading={saving} fullWidth>Save Business</Button>
+                <Button variant="outline" onClick={() => setShowBizModal(false)} fullWidth>Cancel</Button>
+              </div>
+            </div>
           </div>
         )}
+
+        {/* SERVICE MODAL */}
+        {showSvcModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-5">{editSvc ? 'Edit Service' : 'Add New Service'}</h3>
+              <div className="space-y-4">
+                <input value={svcForm.name} onChange={e => setSvcForm({ ...svcForm, name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Service name (e.g. Haircut)" />
+                <textarea value={svcForm.description} onChange={e => setSvcForm({ ...svcForm, description: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Service description (optional)" rows={2} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase">Price (₹)</label>
+                    <input value={svcForm.price} onChange={e => setSvcForm({ ...svcForm, price: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" type="number" min="0" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase">Duration (mins)</label>
+                    <input value={svcForm.duration} onChange={e => setSvcForm({ ...svcForm, duration: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" type="number" min="15" placeholder="60" />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button onClick={saveService} loading={saving} fullWidth>{editSvc ? 'Update Service' : 'Add Service'}</Button>
+                <Button variant="outline" onClick={() => setShowSvcModal(false)} fullWidth>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PROMOTION MODAL */}
+        {showPromoModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-5">{editPromo ? 'Edit Promotion' : 'Add Promotion'}</h3>
+              <div className="space-y-4">
+                <input value={promoForm.title} onChange={e => setPromoForm({ ...promoForm, title: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Offer Title (e.g. Summer Special)" />
+                <input value={promoForm.discount_pct} onChange={e => setPromoForm({ ...promoForm, discount_pct: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" type="number" min="1" max="100" placeholder="Discount % (e.g. 20)" />
+                <textarea value={promoForm.description} onChange={e => setPromoForm({ ...promoForm, description: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none" placeholder="Tell customers about the deal..." rows={2} />
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button onClick={savePromotion} loading={saving} variant="accent" fullWidth>{editPromo ? 'Update' : 'Post Promotion'}</Button>
+                <Button variant="outline" onClick={() => setShowPromoModal(false)} fullWidth>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
-
-      <Modal open={showBizModal} onClose={() => setShowBizModal(false)} title={business ? 'Edit Business' : 'Create Business'} size="lg">
-        <div className="space-y-4">
-          <Input label="Business Name" value={bizForm.name} onChange={e => setBizForm(f => ({ ...f, name: e.target.value }))} required />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Description</label>
-            <textarea
-              value={bizForm.description}
-              onChange={e => setBizForm(f => ({ ...f, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Category</label>
-            <select
-              value={bizForm.category_id}
-              onChange={e => setBizForm(f => ({ ...f, category_id: e.target.value }))}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Select a category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Address" value={bizForm.address} onChange={e => setBizForm(f => ({ ...f, address: e.target.value }))} />
-            <Input label="City" value={bizForm.city} onChange={e => setBizForm(f => ({ ...f, city: e.target.value }))} />
-            <Input label="Phone" value={bizForm.phone} onChange={e => setBizForm(f => ({ ...f, phone: e.target.value }))} />
-            <Input label="WhatsApp" value={bizForm.whatsapp} onChange={e => setBizForm(f => ({ ...f, whatsapp: e.target.value }))} hint="e.g. +1234567890" />
-          </div>
-          <Input label="Cover Image URL" value={bizForm.cover_url} onChange={e => setBizForm(f => ({ ...f, cover_url: e.target.value }))} hint="Paste a Pexels image URL" />
-          <Button onClick={saveBusiness} loading={saving} fullWidth>{business ? 'Save Changes' : 'Create Business'}</Button>
-        </div>
-      </Modal>
-
-      <Modal open={showSvcModal} onClose={() => setShowSvcModal(false)} title={editSvc ? 'Edit Service' : 'Add Service'}>
-        <div className="space-y-4">
-          <Input label="Service Name" value={svcForm.name} onChange={e => setSvcForm(f => ({ ...f, name: e.target.value }))} required />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Description</label>
-            <textarea value={svcForm.description} onChange={e => setSvcForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Price ($)" type="number" min="0" step="0.01" value={svcForm.price} onChange={e => setSvcForm(f => ({ ...f, price: e.target.value }))} required />
-            <Input label="Duration (min)" type="number" min="15" step="15" value={svcForm.duration} onChange={e => setSvcForm(f => ({ ...f, duration: e.target.value }))} required />
-          </div>
-          <Button onClick={saveService} loading={saving} fullWidth>{editSvc ? 'Save Changes' : 'Add Service'}</Button>
-        </div>
-      </Modal>
-
-      <Modal open={showPromoModal} onClose={() => setShowPromoModal(false)} title={editPromo ? 'Edit Promotion' : 'Add Promotion'}>
-        <div className="space-y-4">
-          <Input label="Title" value={promoForm.title} onChange={e => setPromoForm(f => ({ ...f, title: e.target.value }))} required />
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1.5">Description</label>
-            <textarea value={promoForm.description} onChange={e => setPromoForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
-          </div>
-          <Input label="Discount (%)" type="number" min="1" max="100" value={promoForm.discount_pct} onChange={e => setPromoForm(f => ({ ...f, discount_pct: e.target.value }))} required />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Start Date" type="date" value={promoForm.start_date} onChange={e => setPromoForm(f => ({ ...f, start_date: e.target.value }))} required />
-            <Input label="End Date" type="date" value={promoForm.end_date} onChange={e => setPromoForm(f => ({ ...f, end_date: e.target.value }))} required />
-          </div>
-          <Button onClick={savePromo} loading={saving} fullWidth>{editPromo ? 'Save Changes' : 'Add Promotion'}</Button>
-        </div>
-      </Modal>
     </div>
   );
 }

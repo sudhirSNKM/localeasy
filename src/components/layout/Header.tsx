@@ -64,8 +64,13 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
                       onClick={() => { onNavigate({ page: getDashboardPage() as NavState['page'] }); setDropdownOpen(false); }}
                       className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
                     >
-                      {profile.role === 'super_admin' ? <Shield size={16} /> : <LayoutDashboard size={16} />}
-                      Dashboard
+                      {profile.role === 'super_admin' ? (
+                        <><Shield size={16} className="text-primary-600" /> Super Admin</>
+                      ) : profile.role === 'admin' ? (
+                        <><LayoutDashboard size={16} className="text-primary-600" /> Business Console</>
+                      ) : (
+                        <><User size={16} className="text-primary-600" /> My Bookings</>
+                      )}
                     </button>
                     <hr className="my-1 border-neutral-100" />
                     <button

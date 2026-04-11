@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 import type { BookingWithDetails, NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Badge from '../components/ui/Badge';
@@ -19,21 +20,26 @@ const statusConfig = {
 
 export default function UserDashboard({ onNavigate }: UserDashboardProps) {
   const { user, profile } = useAuth();
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   useEffect(() => {
     if (!user) { onNavigate({ page: 'auth' }); return; }
-    supabase
-      .from('bookings')
-      .select('*, businesses(name, address, city, whatsapp), services(name, price, duration)')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false })
-      .then(({ data }) => {
-        setBookings((data as BookingWithDetails[]) || []);
+    
+    const loadBookings = async () => {
+      try {
+        const q = query(collection(db, 'bookings'), where('user_id', '==', user.uid), orderBy('date', 'desc'));
+        const snapshot = await getDocs(q);
+        setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error('Error loading user bookings:', err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    
+    loadBookings();
   }, [user]);
 
   const today = new Date().toISOString().split('T')[0];
@@ -42,16 +48,21 @@ export default function UserDashboard({ onNavigate }: UserDashboardProps) {
   const displayed = activeTab === 'upcoming' ? upcoming : past;
 
   const cancelBooking = async (id: string) => {
-    await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' } : b));
+    try {
+      await updateDoc(doc(db, 'bookings', id), { status: 'cancelled' });
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' } : b));
+    } catch (err) {
+      console.error('Error cancelling booking:', err);
+    }
   };
 
-  const handleWhatsApp = (booking: BookingWithDetails) => {
-    if (!booking.businesses.whatsapp) return;
+  const handleWhatsApp = (booking: any) => {
+    if (!booking.business_whatsapp && !booking.whatsapp) return;
+    const whatsapp = booking.business_whatsapp || booking.whatsapp;
     const msg = encodeURIComponent(
-      `Hi! I have a booking for "${booking.services.name}" on ${booking.date} at ${booking.time_slot}.`
+      `Hi! I have a booking for "${booking.service_name}" on ${booking.date} at ${booking.time_slot}.`
     );
-    window.open(`https://wa.me/${booking.businesses.whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
+    window.open(`https://wa.me/${whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
   };
 
   return (
@@ -114,7 +125,7 @@ export default function UserDashboard({ onNavigate }: UserDashboardProps) {
         ) : (
           <div className="space-y-3">
             {displayed.map(booking => {
-              const sc = statusConfig[booking.status];
+              const sc = statusConfig[booking.status as keyof typeof statusConfig] || statusConfig.pending;
               return (
                 <div key={booking.id} className="bg-white rounded-xl shadow-card p-5">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -124,26 +135,22 @@ export default function UserDashboard({ onNavigate }: UserDashboardProps) {
                           <span className="flex items-center gap-1">{sc.icon}{sc.label}</span>
                         </Badge>
                       </div>
-                      <h3 className="font-semibold text-neutral-900 mb-0.5">{booking.services.name}</h3>
-                      <p className="text-primary-600 text-sm font-medium mb-2">{booking.businesses.name}</p>
+                      <h3 className="font-semibold text-neutral-900 mb-0.5">{booking.service_name || 'Service'}</h3>
+                      <p className="text-primary-600 text-sm font-medium mb-2">{booking.business_name || 'Business'}</p>
                       <div className="flex flex-wrap gap-3 text-xs text-neutral-500">
                         <span className="flex items-center gap-1"><Calendar size={12} />{new Date(booking.date).toLocaleDateString()}</span>
-                        <span className="flex items-center gap-1"><Clock size={12} />{booking.time_slot} · {booking.services.duration} min</span>
-                        <span className="flex items-center gap-1"><MapPin size={12} />{booking.businesses.city}</span>
+                        <span className="flex items-center gap-1"><Clock size={12} />{booking.time_slot}</span>
                       </div>
-                      {booking.notes && <p className="text-neutral-500 text-xs mt-2 italic">"{booking.notes}"</p>}
                     </div>
                     <div className="flex flex-col gap-2 items-start sm:items-end">
-                      <span className="text-lg font-bold text-neutral-900">${booking.services.price.toFixed(2)}</span>
+                      <span className="text-lg font-bold text-neutral-900">₹{booking.price || 0}</span>
                       <div className="flex gap-2">
-                        {booking.businesses.whatsapp && (
-                          <button
-                            onClick={() => handleWhatsApp(booking)}
-                            className="flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700 font-medium"
-                          >
-                            <MessageCircle size={12} /> WhatsApp
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleWhatsApp(booking)}
+                          className="flex items-center gap-1 text-xs text-accent-600 hover:text-accent-700 font-medium"
+                        >
+                          <MessageCircle size={12} /> WhatsApp
+                        </button>
                         {booking.status === 'pending' && (
                           <button
                             onClick={() => cancelBooking(booking.id)}

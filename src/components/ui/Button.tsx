@@ -1,16 +1,17 @@
 import { ReactNode, ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
+type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'accent';
 type Size = 'sm' | 'md' | 'lg';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
-  secondary: 'bg-secondary-500 text-white hover:bg-secondary-600 focus:ring-secondary-400',
-  outline: 'border border-neutral-300 text-neutral-700 hover:bg-neutral-50 focus:ring-neutral-400',
-  ghost: 'text-neutral-600 hover:bg-neutral-100 focus:ring-neutral-400',
-  danger: 'bg-error-500 text-white hover:bg-error-700 focus:ring-error-500',
-  success: 'bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500',
+  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+  secondary: 'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400',
+  outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-400',
+  ghost: 'text-gray-600 hover:bg-gray-100 focus:ring-gray-400',
+  danger: 'bg-red-500 text-white hover:bg-red-700 focus:ring-red-500',
+  success: 'bg-green-500 text-white hover:bg-green-600 focus:ring-green-500',
+  accent: 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500',
 };
 
 const sizes: Record<Size, string> = {
@@ -41,7 +42,7 @@ export default function Button({
     <button
       disabled={disabled || loading}
       className={`
-        inline-flex items-center justify-center gap-2 font-medium transition-all
+        inline-flex items-center justify-center gap-2 font-semibold transition-all
         focus:outline-none focus:ring-2 focus:ring-offset-1
         disabled:opacity-50 disabled:cursor-not-allowed
         ${variants[variant]}

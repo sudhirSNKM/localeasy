@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Search, ArrowRight, Star, CheckCircle, Scissors, Sparkles, Smile, Dumbbell, Utensils, Car, Home as HomeIcon, Camera } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { dataService } from '../lib/dataService';
 import type { BusinessWithCategory, Category, Promotion, NavState } from '../lib/types';
 import BusinessCard from '../components/business/BusinessCard';
+import PromotionCarousel from '../components/business/PromotionCarousel';
 import Badge from '../components/ui/Badge';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HomeProps {
   onNavigate: (state: NavState) => void;
@@ -21,6 +23,7 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 export default function Home({ onNavigate }: HomeProps) {
+  const { user, profile } = useAuth();
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [businesses, setBusinesses] = useState<BusinessWithCategory[]>([]);
@@ -28,19 +31,25 @@ export default function Home({ onNavigate }: HomeProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const [cats, bizs, promos] = await Promise.all([
-        supabase.from('categories').select('*').order('name'),
-        supabase.from('businesses').select('*, categories(*)').eq('status', 'approved').order('rating', { ascending: false }).limit(8),
-        supabase.from('promotions').select('*, businesses(name, city)').eq('status', 'active').limit(4),
-      ]);
-      setCategories(cats.data || []);
-      setBusinesses((bizs.data as BusinessWithCategory[]) || []);
-      setPromotions(promos.data || []);
-      setLoading(false);
+    const loadData = async () => {
+      try {
+        const [cats, bizs, promos] = await Promise.all([
+          dataService.getCategories(),
+          dataService.getFeaturedBusinesses(),
+          dataService.getPromotions(),
+        ]);
+        setCategories(cats);
+        setBusinesses(bizs);
+        setPromotions(promos);
+      } catch (err) {
+        console.error('Error loading home data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    load();
+    loadData();
   }, []);
+
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,9 +166,15 @@ export default function Home({ onNavigate }: HomeProps) {
           ) : (
             <div className="text-center py-12">
               <p className="text-neutral-500">No businesses available yet. Be the first to list yours!</p>
-              <button
-                onClick={() => onNavigate({ page: 'auth' })}
-                className="mt-4 bg-primary-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
+               <button
+                onClick={() => {
+                  if (user) {
+                    onNavigate({ page: profile?.role === 'super_admin' ? 'super-admin' : 'admin-dashboard' });
+                  } else {
+                    onNavigate({ page: 'auth' });
+                  }
+                }}
+                className="mt-4 bg-primary-600 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-primary-700 transition-all shadow-lg hover:shadow-primary-200"
               >
                 List Your Business
               </button>
@@ -172,21 +187,11 @@ export default function Home({ onNavigate }: HomeProps) {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Current Promotions</h2>
-              <p className="text-neutral-500 text-sm mt-1">Limited-time deals from local businesses</p>
+              <h2 className="text-2xl font-bold text-neutral-900">Exclusive Deals</h2>
+              <p className="text-neutral-500 text-sm mt-1">Don't miss out on these limited-time offers</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {promotions.map(promo => (
-              <div key={promo.id} className="bg-gradient-to-br from-secondary-500 to-secondary-600 rounded-2xl p-5 text-white shadow-card">
-                <div className="text-4xl font-bold mb-1">{promo.discount_pct}%</div>
-                <div className="text-secondary-100 text-xs mb-3">OFF</div>
-                <h4 className="font-semibold text-base mb-1 leading-snug">{promo.title}</h4>
-                <p className="text-secondary-100 text-xs line-clamp-2 mb-3">{promo.description}</p>
-                <div className="text-xs text-secondary-200">Valid until {new Date(promo.end_date).toLocaleDateString()}</div>
-              </div>
-            ))}
-          </div>
+          <PromotionCarousel promotions={promotions} />
         </section>
       )}
 
