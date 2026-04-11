@@ -15,8 +15,10 @@ import SuperAdmin from './pages/SuperAdmin';
 import ProfilePage from './pages/ProfilePage';
 import AdminAnalysis from './pages/AdminAnalysis';
 import BottomNav from './components/layout/BottomNav';
+import { useAuth } from './contexts/AuthContext';
 
 function AppContent() {
+  const { loading: authLoading } = useAuth();
   const [nav, setNav] = useState<NavState>(() => {
     const path = window.location.pathname.split('/').filter(Boolean);
     if (path[0] === 'browse') return { page: 'browse' };
@@ -59,6 +61,14 @@ function AppContent() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-[#3A6FF8] border-t-transparent animate-spin rounded-full shadow-lg" />
+      </div>
+    );
+  }
 
   const renderPage = () => {
     switch (nav.page) {

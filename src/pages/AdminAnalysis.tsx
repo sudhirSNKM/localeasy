@@ -155,11 +155,3 @@ export default function AdminAnalysis({ onNavigate }: AdminAnalysisProps) {
     </div>
   );
 }
-
-function Stars({ size, className }: any) {
-  return <TrendingUp size={size} className={className} />;
-}
-
-function Clock({ size, className }: any) {
-  return <BarChart2 size={size} className={className} />;
-}
