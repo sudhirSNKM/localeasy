@@ -18,7 +18,7 @@ const AVATAR_EMOJIS = [
 ];
 
 export default function ProfilePage({ onNavigate, onClose }: ProfilePageProps) {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
   const [selectedEmoji, setSelectedEmoji] = useState(profile?.avatar_url || '😊');
@@ -26,7 +26,25 @@ export default function ProfilePage({ onNavigate, onClose }: ProfilePageProps) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  if (!user || !profile) return null;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen pt-32 flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-[#3A6FF8] border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-[#6B7280] animate-pulse text-center">Synchronizing Profile...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    onNavigate({ page: 'auth' });
+    return null;
+  }
+
+  if (!profile) return (
+    <div className="min-h-screen pt-32 flex flex-col items-center p-8 text-center">
+       <p className="text-sm font-bold text-[#6B7280]">Connecting to secure storage...</p>
+    </div>
+  );
 
   const isProfileComplete = fullName.trim().length >= 2 && phone.trim().length >= 10;
 
@@ -58,8 +76,8 @@ export default function ProfilePage({ onNavigate, onClose }: ProfilePageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 pb-12">
-      <div className="max-w-lg mx-auto px-4">
+    <div className="pt-28 pb-10">
+      <div className="max-w-xl mx-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between mb-8 mt-4">
@@ -105,15 +123,17 @@ export default function ProfilePage({ onNavigate, onClose }: ProfilePageProps) {
           </div>
 
           {/* Emoji Picker */}
-          <div className="p-5 border-b border-gray-100">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Choose Avatar</label>
-            <div className="grid grid-cols-10 gap-1.5">
+          <div className="p-6 border-b border-[#E6EAF0]">
+            <label className="block text-[10px] font-black text-[#9AA4B2] uppercase tracking-widest mb-4">Choose Avatar</label>
+            <div className="grid grid-cols-6 sm:grid-cols-10 gap-3">
               {AVATAR_EMOJIS.map(emoji => (
                 <button
                   key={emoji}
                   onClick={() => setSelectedEmoji(emoji)}
-                  className={`text-2xl p-1.5 rounded-xl transition-all hover:scale-110 ${
-                    selectedEmoji === emoji ? 'bg-blue-100 ring-2 ring-blue-400 scale-110' : 'hover:bg-gray-100'
+                  className={`w-10 h-10 flex items-center justify-center text-2xl transition-all hover:scale-110 rounded-full ${
+                    selectedEmoji === emoji 
+                      ? 'bg-[#3A6FF8] text-white shadow-lg shadow-blue-200 ring-4 ring-blue-50' 
+                      : 'hover:bg-[#F2F4F7]'
                   }`}
                 >
                   {emoji}

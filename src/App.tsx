@@ -9,9 +9,12 @@ import BusinessDetail from './pages/BusinessDetail';
 import Booking from './pages/Booking';
 import Auth from './pages/Auth';
 import UserDashboard from './pages/UserDashboard';
+import UserBookings from './pages/UserBookings';
 import AdminDashboard from './pages/AdminDashboard';
 import SuperAdmin from './pages/SuperAdmin';
 import ProfilePage from './pages/ProfilePage';
+import AdminAnalysis from './pages/AdminAnalysis';
+import BottomNav from './components/layout/BottomNav';
 
 function AppContent() {
   const [nav, setNav] = useState<NavState>(() => {
@@ -21,7 +24,9 @@ function AppContent() {
     if (path[0] === 'super-admin') return { page: 'super-admin' };
     if (path[0] === 'admin-dashboard') return { page: 'admin-dashboard' };
     if (path[0] === 'dashboard') return { page: 'user-dashboard' };
+    if (path[0] === 'bookings') return { page: 'user-bookings' };
     if (path[0] === 'profile') return { page: 'profile' };
+    if (path[0] === 'analysis') return { page: 'admin-analysis' };
     if (path[0] === 'business' && path[1]) return { page: 'business-detail', businessId: path[1] };
     if (path[0] === 'book' && path[1] && path[2]) return { page: 'booking', businessId: path[1], serviceId: path[2] };
     return { page: 'home' };
@@ -36,7 +41,9 @@ function AppContent() {
       if (state.page === 'super-admin') url = '/super-admin';
       if (state.page === 'admin-dashboard') url = '/admin-dashboard';
       if (state.page === 'user-dashboard') url = '/dashboard';
+      if (state.page === 'user-bookings') url = '/bookings';
       if (state.page === 'profile') url = '/profile';
+      if (state.page === 'admin-analysis') url = '/analysis';
       if (state.page === 'business-detail') url = `/business/${state.businessId}`;
       if (state.page === 'booking') url = `/book/${state.businessId}/${state.serviceId}`;
       window.history.pushState(state, '', url);
@@ -64,35 +71,53 @@ function AppContent() {
           ? <BusinessDetail businessId={nav.businessId} onNavigate={handleNavigate} />
           : <Home onNavigate={handleNavigate} />;
       case 'booking':
-        return nav.businessId && nav.serviceId
-          ? <Booking businessId={nav.businessId} serviceId={nav.serviceId} onNavigate={handleNavigate} />
+        return nav.businessId
+          ? <Booking businessId={nav.businessId} serviceId={nav.serviceId || 'default'} onNavigate={handleNavigate} />
           : <Browse onNavigate={handleNavigate} />;
       case 'auth':
         return <Auth onNavigate={handleNavigate} />;
       case 'user-dashboard':
         return <UserDashboard onNavigate={handleNavigate} />;
+      case 'user-bookings':
+        return <UserBookings onNavigate={handleNavigate} />;
       case 'admin-dashboard':
         return <AdminDashboard onNavigate={handleNavigate} />;
       case 'super-admin':
         return <SuperAdmin onNavigate={handleNavigate} />;
       case 'profile':
         return <ProfilePage onNavigate={handleNavigate} />;
+      case 'admin-analysis':
+        return <AdminAnalysis onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }
   };
 
-  const showHeader = nav.page !== 'auth';
-  const showFooter = nav.page !== 'auth' && nav.page !== 'booking';
+  const showHeader = true; // Header present in every page
+  const showBottomNav = nav.page !== 'auth' && nav.page !== 'booking';
 
   return (
-    <div className="min-h-screen font-sans">
-      {showHeader && <Header nav={nav} onNavigate={handleNavigate} />}
-      <main className="transition-all duration-300">{renderPage()}</main>
-      {showFooter && <Footer onNavigate={handleNavigate} />}
+    <div className="min-h-screen font-sans bg-[#F2F4F7] w-full">
+      {/* Balanced Outer Container */}
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 min-h-screen relative pb-24">
+        <Header nav={nav} onNavigate={handleNavigate} />
+        
+        <main className="transition-all duration-300">
+          {renderPage()}
+        </main>
+
+        {showBottomNav && (
+          <BottomNav activePage={nav.page} onNavigate={handleNavigate} />
+        )}
+      </div>
     </div>
   );
 }
+
+
+
+
+
 
 export default function App() {
   return (

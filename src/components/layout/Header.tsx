@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MapPin, Menu, X, LogOut, LayoutDashboard, Shield, BookOpen, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 import type { NavState } from '../../lib/types';
 
 interface HeaderProps {
@@ -8,13 +9,11 @@ interface HeaderProps {
   onNavigate: (state: NavState) => void;
 }
 
-const isEmoji = (str: string) => {
-  // Simple check: if avatar_url is a short string (emoji), use it directly
-  return str && str.length <= 4;
-};
+const isEmoji = (str: string) => !!str && str.length <= 4;
 
 export default function Header({ nav, onNavigate }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
+  const { pendingBookings, pendingBusinesses, total } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -32,44 +31,44 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
   };
 
   const getDashboardLabel = () => {
-    if (profile?.role === 'super_admin') return { icon: <Shield size={15} className="text-blue-600" />, text: 'Super Admin' };
-    if (profile?.role === 'admin') return { icon: <LayoutDashboard size={15} className="text-blue-600" />, text: 'Business Console' };
-    return { icon: <BookOpen size={15} className="text-blue-600" />, text: 'My Bookings' };
+    if (profile?.role === 'super_admin') return { icon: <Shield size={15} className="text-blue-600" />, text: 'Super Admin', count: pendingBusinesses };
+    if (profile?.role === 'admin') return { icon: <LayoutDashboard size={15} className="text-blue-600" />, text: 'Business Console', count: pendingBookings };
+    return { icon: <BookOpen size={15} className="text-blue-600" />, text: 'My Bookings', count: 0 };
   };
 
   const dashLabel = getDashboardLabel();
-
-  // Determine avatar display
   const avatar = profile?.avatar_url;
   const useEmojiAvatar = avatar && isEmoji(avatar);
   const initial = profile?.full_name?.charAt(0)?.toUpperCase() || 'U';
-
-  // Check profile completion
   const profileComplete = profile && profile.full_name && profile.phone && profile.phone.length >= 10;
 
+  // Notification Dot component
+  const NotifDot = ({ count }: { count: number }) =>
+    count > 0 ? (
+      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white shadow-sm z-10">
+        {count > 9 ? '9+' : count}
+      </span>
+    ) : null;
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="fixed top-0 left-0 right-0 z-[60] bg-white/80 backdrop-blur-md border-b border-[#E6EAF0] w-full">
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16">
+        <div className="flex items-center justify-between h-20">
 
           {/* Logo */}
-          <button
-            onClick={() => onNavigate({ page: 'home' })}
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
-          >
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <MapPin size={18} className="text-white" />
+          <button onClick={() => onNavigate({ page: 'home' })} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <div className="w-10 h-10 bg-[#3A6FF8] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+              <MapPin size={22} className="text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">Local<span className="text-blue-600">Ease</span></span>
+            <span className="text-2xl font-black text-[#0F172A] tracking-tighter">Local<span className="text-[#3A6FF8]">Ease</span></span>
           </button>
+
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6">
             <button
               onClick={() => onNavigate({ page: 'browse' })}
-              className={`text-sm font-semibold transition-colors ${
-                nav.page === 'browse' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`text-sm font-semibold transition-colors ${nav.page === 'browse' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Browse
             </button>
@@ -80,14 +79,16 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-base relative ${
-                    useEmojiAvatar ? 'bg-blue-50 border-2 border-blue-100 text-xl' : 'bg-blue-600 text-white'
-                  }`}>
-                    {useEmojiAvatar ? avatar : initial}
-                    {/* Red dot if profile incomplete */}
-                    {!profileComplete && (
-                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+                  {/* Avatar with notification dot */}
+                  <div className="relative">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-base ${
+                      useEmojiAvatar ? 'bg-blue-50 border-2 border-blue-100 text-xl' : 'bg-blue-600 text-white text-sm'
+                    }`}>
+                      {useEmojiAvatar ? avatar : initial}
+                    </div>
+                    {/* Red dot: profile incomplete OR has notifications */}
+                    {(!profileComplete || total > 0) && (
+                      <NotifDot count={profileComplete ? total : 1} />
                     )}
                   </div>
                   <span className="max-w-[100px] truncate">{profile.full_name?.split(' ')[0] || 'Account'}</span>
@@ -96,13 +97,13 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
                 {dropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden">
-                      
-                      {/* Profile header in dropdown */}
+                    <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden">
+
+                      {/* Profile header */}
                       <div className="px-4 py-3 border-b border-gray-50">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
-                            useEmojiAvatar ? 'bg-blue-50' : 'bg-blue-600 text-white font-bold'
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${
+                            useEmojiAvatar ? 'bg-blue-50' : 'bg-blue-600 text-white font-bold text-sm'
                           }`}>
                             {useEmojiAvatar ? avatar : initial}
                           </div>
@@ -118,27 +119,45 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
                           </div>
                         </div>
                         {!profileComplete && (
-                          <div className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-1.5 font-medium">
-                            ⚠️ Complete your profile
+                          <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 font-semibold border border-amber-200">
+                            ⚠️ Profile incomplete — add phone number
                           </div>
                         )}
                       </div>
 
                       {/* Edit Profile */}
                       <button
-                        onClick={() => { onNavigate({ page: 'profile' }); setDropdownOpen(false); }}
-                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onNavigate({ page: 'profile' });
+                          setDropdownOpen(false);
+                        }}
+                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50 transition-colors font-semibold relative z-[60]"
                       >
-                        <UserCircle size={15} className="text-gray-400" /> Edit Profile
+                        <UserCircle size={15} className="text-blue-600" />
+                        Edit Profile
                       </button>
 
-                      {/* Dashboard link */}
+                      {/* Dashboard link with notification badge */}
                       <button
-                        onClick={() => { onNavigate({ page: getDashboardPage() }); setDropdownOpen(false); }}
-                        className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors font-semibold"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onNavigate({ page: getDashboardPage() });
+                          setDropdownOpen(false);
+                        }}
+                        className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 transition-colors font-semibold relative z-[60]"
                       >
-                        {dashLabel.icon}
-                        {dashLabel.text}
+                        <span className="flex items-center gap-2.5">
+                          {dashLabel.icon}
+                          {dashLabel.text}
+                        </span>
+                        {dashLabel.count > 0 && (
+                          <span className="bg-red-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                            {dashLabel.count > 9 ? '9+' : dashLabel.count}
+                          </span>
+                        )}
                       </button>
 
                       <div className="border-t border-gray-100 mt-1 pt-1">
@@ -156,19 +175,19 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
             ) : (
               <button
                 onClick={() => onNavigate({ page: 'auth' })}
-                className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+                className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
               >
                 Sign In
               </button>
             )}
           </nav>
 
-          {/* Mobile Hamburger */}
-          <button
-            className="md:hidden p-2 text-gray-600 hover:text-gray-900"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
+          {/* Mobile hamburger */}
+          <button className="md:hidden p-2 text-gray-600 relative" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {total > 0 && !menuOpen && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+            )}
           </button>
         </div>
       </div>
@@ -192,9 +211,14 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
               </button>
               <button
                 onClick={() => { onNavigate({ page: getDashboardPage() }); setMenuOpen(false); }}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-700 py-2.5 px-3 rounded-xl hover:bg-gray-50 w-full"
+                className="flex items-center justify-between text-sm font-semibold text-gray-700 py-2.5 px-3 rounded-xl hover:bg-blue-50 w-full"
               >
-                {dashLabel.icon} {dashLabel.text}
+                <span className="flex items-center gap-2">{dashLabel.icon} {dashLabel.text}</span>
+                {dashLabel.count > 0 && (
+                  <span className="bg-red-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                    {dashLabel.count}
+                  </span>
+                )}
               </button>
               <button
                 onClick={handleSignOut}

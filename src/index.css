@@ -4,25 +4,51 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+:root {
+  --bg-main: #F2F4F7;
+  --bg-card: #FFFFFF;
+  --border-color: #E6EAF0;
+  --primary: #3A6FF8;
+  --text-active: #0F172A;
+  --text-secondary: #6B7280;
+  --text-muted: #9AA4B2;
+  --star: #F59E0B;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-active);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card-soft {
+    @apply bg-white border border-[#E6EAF0] rounded-[16px] shadow-sm transition-all active:scale-[0.98];
   }
 
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    color: #0f172a;
-    background-color: #f8fafc;
+  .btn-primary {
+    @apply bg-[#3A6FF8] text-white py-3 rounded-[12px] font-semibold text-sm transition-all active:scale-[0.98] hover:opacity-90;
+  }
+
+  .btn-white {
+    @apply bg-white text-[#3A6FF8] py-3 rounded-[12px] font-semibold text-sm transition-all active:scale-[0.98] shadow-md;
+  }
+
+  .pill {
+    @apply rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider;
+  }
+
+  .gradient-card {
+    @apply bg-gradient-to-br from-[#3A6FF8] to-[#22C1C3] text-white p-5 rounded-[20px] shadow-lg;
   }
 }
 
-@layer utilities {
-  .scrollbar-none {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
+/* Hide scrollbars but allow scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

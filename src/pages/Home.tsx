@@ -1,221 +1,274 @@
-import { useEffect, useState } from 'react';
-import { Search, ArrowRight, Star, CheckCircle, Scissors, Sparkles, Smile, Dumbbell, Utensils, Car, Home as HomeIcon, Camera } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Star, MapPin, ArrowRight, Sparkles, Calendar } from 'lucide-react';
 import { dataService } from '../lib/dataService';
 import type { BusinessWithCategory, Category, Promotion, NavState } from '../lib/types';
-import BusinessCard from '../components/business/BusinessCard';
-import PromotionCarousel from '../components/business/PromotionCarousel';
-import Badge from '../components/ui/Badge';
-import { useAuth } from '../contexts/AuthContext';
 
 interface HomeProps {
   onNavigate: (state: NavState) => void;
 }
 
-const iconMap: Record<string, React.ReactNode> = {
-  scissors: <Scissors size={22} />,
-  sparkles: <Sparkles size={22} />,
-  smile: <Smile size={22} />,
-  dumbbell: <Dumbbell size={22} />,
-  utensils: <Utensils size={22} />,
-  car: <Car size={22} />,
-  home: <HomeIcon size={22} />,
-  camera: <Camera size={22} />,
+const iconMap: Record<string, string> = {
+  scissors: '💇‍♂️',
+  sparkles: '✨',
+  smile: '🦷',
+  dumbbell: '💪',
+  utensils: '🍕',
+  car: '🚗',
+  home: '🏠',
+  camera: '📸',
 };
 
 export default function Home({ onNavigate }: HomeProps) {
-  const { user, profile } = useAuth();
-  const [search, setSearch] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [businesses, setBusinesses] = useState<BusinessWithCategory[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       try {
-        const [cats, bizs, promos] = await Promise.all([
+        const [cats, biz, promos] = await Promise.all([
           dataService.getCategories(),
           dataService.getFeaturedBusinesses(),
           dataService.getPromotions(),
         ]);
         setCategories(cats);
-        setBusinesses(bizs);
-        setPromotions(promos);
+        setBusinesses(biz.slice(0, 4));
+        setPromotions(promos.slice(0, 3));
       } catch (err) {
-        console.error('Error loading home data:', err);
+        console.error('Error fetching home data:', err);
       } finally {
         setLoading(false);
       }
     };
-    loadData();
+    fetchData();
   }, []);
 
+  // Auto-scroll logic
+  useEffect(() => {
+    if (loading || (businesses.length === 0 && promotions.length === 0)) return;
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    onNavigate({ page: 'browse' });
-  };
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        const maxScroll = scrollWidth - clientWidth;
+        
+        if (scrollLeft >= maxScroll - 10) {
+          scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          scrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+        }
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [loading, businesses, promotions]);
 
   return (
-    <div>
-      <section className="relative bg-gradient-to-br from-primary-700 via-primary-600 to-primary-500 overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary-400 rounded-full translate-y-1/2 -translate-x-1/2" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-20 md:pt-36 md:pb-28">
-          <div className="max-w-2xl">
-            <Badge variant="secondary" className="mb-4">Trusted by 10,000+ locals</Badge>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-              Discover the Best<br />
-              <span className="text-secondary-300">Local Services</span><br />
-              Near You
-            </h1>
-            <p className="text-primary-100 text-lg mb-8 leading-relaxed">
-              Book appointments with top-rated local businesses instantly. Hair, wellness, dental, fitness and more.
-            </p>
-            <form onSubmit={handleSearch} className="flex gap-2 max-w-lg">
-              <div className="relative flex-1">
-                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search services or businesses..."
-                  className="w-full pl-10 pr-4 py-3.5 rounded-xl text-sm border-0 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-neutral-900"
-                />
-              </div>
-              <button
-                type="submit"
-                className="bg-secondary-500 hover:bg-secondary-600 text-white px-5 py-3.5 rounded-xl text-sm font-semibold shadow-lg transition-colors whitespace-nowrap"
-              >
-                Search
-              </button>
-            </form>
+    <div className="pt-28 pb-10">
+      
+      {/* 1. Header (Dynamic Grid Feel) */}
+      <div className="mb-12">
+        <h1 className="text-4xl md:text-5xl font-black text-[#0F172A] mb-3 tracking-tighter">Discover. Book. <span className="text-[#3A6FF8]">Done.</span></h1>
+        <p className="text-lg text-[#6B7280] font-medium">Find the best local services near you</p>
+      </div>
 
-            <div className="flex flex-wrap items-center gap-4 mt-8">
-              {[['10K+', 'Happy Customers'], ['500+', 'Local Businesses'], ['4.8', 'Average Rating']].map(([num, label]) => (
-                <div key={label} className="flex items-center gap-2">
-                  <span className="text-white font-bold text-lg">{num}</span>
-                  <span className="text-primary-200 text-sm">{label}</span>
-                </div>
-              ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        
+        {/* LEFT COLUMN (Main Content) */}
+        <div className="lg:col-span-2 space-y-10">
+          
+          {/* 2. Categories Grid */}
+          <section>
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="font-bold text-lg text-[#0F172A] tracking-tight">Browse Categories</h3>
+               <button onClick={() => onNavigate({ page: 'browse' })} className="text-xs font-bold text-[#3A6FF8] uppercase">View All</button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Browse Categories</h2>
-            <p className="text-neutral-500 text-sm mt-1">Find services by category</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => onNavigate({ page: 'browse' })}
-              className="group flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-card hover:shadow-card-hover border border-neutral-100 hover:border-primary-200 transition-all duration-200"
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-white transition-transform group-hover:scale-110"
-                style={{ backgroundColor: cat.color }}
-              >
-                {iconMap[cat.icon] || <HomeIcon size={22} />}
-              </div>
-              <span className="text-xs font-medium text-neutral-700 text-center leading-tight">{cat.name}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="bg-neutral-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Featured Businesses</h2>
-              <p className="text-neutral-500 text-sm mt-1">Top-rated services in your area</p>
+            
+            <div className="grid grid-cols-5 gap-2">
+              {categories.length > 0 ? categories.map((cat) => (
+                <button 
+                  key={cat.id} 
+                  onClick={() => onNavigate({ page: 'browse' })}
+                  className="flex flex-col items-center justify-center text-center group transition-all"
+                >
+                  <div 
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-[#E6EAF0] shrink-0 group-hover:scale-110 group-hover:shadow-md transition-all"
+                    style={{ backgroundColor: `${cat.color}15` }}
+                  >
+                    {iconMap[cat.icon] || '🎯'}
+                  </div>
+                  <span className="text-[8px] font-black mt-2 text-[#6B7280] uppercase tracking-tighter truncate w-full group-hover:text-[#0F172A] transition-colors">{cat.name}</span>
+                </button>
+              )) : (
+                [1,2,3,4,5].map(i => <div key={i} className="h-16 card-soft animate-pulse" />)
+              )}
             </div>
-            <button
-              onClick={() => onNavigate({ page: 'browse' })}
-              className="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-            >
-              View All <ArrowRight size={16} />
-            </button>
-          </div>
+          </section>
 
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl shadow-card overflow-hidden animate-pulse">
-                  <div className="h-48 bg-neutral-200" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-4 bg-neutral-200 rounded w-3/4" />
-                    <div className="h-3 bg-neutral-200 rounded w-1/2" />
+          {/* 3. Horizontal Trending & Offers Loop */}
+          <section className="space-y-4">
+             <div className="flex justify-between items-end pr-4">
+               <div>
+                 <h3 className="font-bold text-lg text-[#0F172A] tracking-tight">Trending & Exclusive Offers</h3>
+                 <p className="text-[10px] text-[#9AA4B2] font-bold uppercase tracking-widest mt-0.5">Handpicked for you today</p>
+               </div>
+               <span className="flex items-center gap-1.5 text-[10px] font-black text-[#0EA5E9] uppercase tracking-widest bg-sky-50 px-3 py-1 rounded-full animate-pulse border border-sky-100">
+                 <div className="w-1.5 h-1.5 bg-[#0EA5E9] rounded-full" /> LIVE DEALS
+               </span>
+             </div>
+
+            <div 
+              ref={scrollRef}
+              className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 hide-scrollbar -mx-4 px-4 scroll-smooth"
+            >
+              {/* Combine trending businesses first, then offers */}
+              {[
+                ...businesses.slice(0, 3).map(b => ({ ...b, type: 'trending' })),
+                ...promotions.slice(0, 3).map(p => ({ ...p, type: 'offer' }))
+              ].map((item: any, idx) => {
+                const isPromo = item.type === 'offer';
+                return (
+                  <div 
+                    key={item.id}
+                    onClick={() => onNavigate({ 
+                      page: isPromo ? 'booking' : 'business-detail', 
+                      businessId: isPromo ? item.business_id : item.id, 
+                      serviceId: 'default' 
+                    })}
+                    className="min-w-[85%] md:min-w-[450px] snap-center relative overflow-hidden cursor-pointer group rounded-3xl"
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br transition-transform duration-500 group-hover:scale-105 ${
+                      isPromo 
+                        ? 'from-[#3A6FF8] to-[#1E40AF]' 
+                        : (idx % 2 === 0 ? 'from-[#0EA5E9] to-[#38BDF8]' : 'from-[#7C3AED] to-[#A855F7]')
+                    }`} />
+                    
+                    {/* Decorative glass elements */}
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
+                    <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+
+                    <div className="relative p-6 text-white min-h-[160px] flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-3 px-1">
+                           <div className="flex items-center gap-2">
+                             {isPromo ? <Sparkles size={12} className="text-yellow-300 fill-current" /> : <Star size={12} className="text-white/70 fill-current" />}
+                             <span className={`text-[10px] font-black uppercase tracking-widest ${isPromo ? 'text-yellow-400' : 'text-white'}`}>
+                               {isPromo ? `${item.discount_pct}% OFF DEAL` : 'POPULAR RECENTLY'}
+                             </span>
+                           </div>
+                           <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all">
+                              <ArrowRight size={16} className="text-white" />
+                           </div>
+                        </div>
+                        <h2 className="text-2xl font-black leading-tight truncate text-white">{isPromo ? item.title : item.name}</h2>
+                        <p className="text-xs text-white/90 font-medium line-clamp-1 mt-1 capitalize">
+                          {isPromo ? item.description : `${item.city} • Rating ⭐ ${item.rating || 'New'}`}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 mt-4">
+                        <div className="px-4 py-1.5 bg-white/20 backdrop-blur-lg border border-white/30 rounded-full font-black text-[10px] uppercase tracking-wider">
+                           Explore Offer
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 4. Recommended Section */}
+          <section>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg text-[#0F172A] tracking-tight">Recommended Services</h3>
+              <button onClick={() => onNavigate({ page: 'browse' })} className="text-xs font-bold text-[#3A6FF8] uppercase">Explore More</button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {loading ? (
+                [1,2,3,4].map(i => <div key={i} className="h-28 card-soft animate-pulse" />)
+              ) : businesses.map((biz) => (
+                <div 
+                  key={biz.id} 
+                  onClick={() => onNavigate({ page: 'business-detail', businessId: biz.id })}
+                  className="card-soft p-5 flex items-center gap-5 cursor-pointer hover:shadow-md transition-all group"
+                >
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-[#E6EAF0] flex items-center justify-center bg-white">
+                    <img 
+                      src={biz.logo_url || 'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=100&h=100&fit=crop'} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform" 
+                      alt="" 
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-bold text-sm text-[#0F172A] truncate leading-tight">{biz.name}</h4>
+                      {biz.rating > 0 && (
+                        <div className="flex items-center text-[10px] font-black text-[#F59E0B] bg-[#F59E0B]/10 px-1.5 py-0.5 rounded-lg">
+                          <Star size={8} className="fill-current mr-0.5" />
+                          {biz.rating}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#9AA4B2] flex items-center gap-1 mt-1.5 font-bold uppercase tracking-wider">
+                      {(categories.find(c => c.id === biz.category_id))?.name || 'Local Service'} • <MapPin size={10} /> {biz.city}
+                    </p>
                   </div>
                 </div>
               ))}
             </div>
-          ) : businesses.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {businesses.map(b => (
-                <BusinessCard key={b.id} business={b} onNavigate={onNavigate} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-neutral-500">No businesses available yet. Be the first to list yours!</p>
-               <button
-                onClick={() => {
-                  if (user) {
-                    onNavigate({ page: profile?.role === 'super_admin' ? 'super-admin' : 'admin-dashboard' });
-                  } else {
-                    onNavigate({ page: 'auth' });
-                  }
-                }}
-                className="mt-4 bg-primary-600 text-white px-8 py-3 rounded-xl text-sm font-bold hover:bg-primary-700 transition-all shadow-lg hover:shadow-primary-200"
-              >
-                List Your Business
-              </button>
-            </div>
-          )}
+          </section>
+
         </div>
-      </section>
 
-      {promotions.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl font-bold text-neutral-900">Exclusive Deals</h2>
-              <p className="text-neutral-500 text-sm mt-1">Don't miss out on these limited-time offers</p>
-            </div>
-          </div>
-          <PromotionCarousel promotions={promotions} />
-        </section>
-      )}
+        {/* RIGHT COLUMN (Sidebar) */}
+        <div className="hidden lg:block relative h-full">
+          <div className="sticky top-6 space-y-6 h-fit">
 
-      <section className="bg-primary-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-3">Why Choose LocalEase?</h2>
-            <p className="text-neutral-500 max-w-lg mx-auto">We connect you with the best local businesses so you can book with confidence.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { icon: <CheckCircle size={28} className="text-accent-500" />, title: 'Verified Businesses', desc: 'Every business is reviewed and approved before listing.' },
-              { icon: <Star size={28} className="text-secondary-500" />, title: 'Honest Reviews', desc: 'Real reviews from real customers in your community.' },
-              { icon: <Search size={28} className="text-primary-500" />, title: 'Easy Booking', desc: 'Book appointments online or via WhatsApp in seconds.' },
-            ].map(item => (
-              <div key={item.title} className="text-center">
-                <div className="flex justify-center mb-4">{item.icon}</div>
-                <h3 className="font-semibold text-neutral-900 mb-2">{item.title}</h3>
-                <p className="text-neutral-500 text-sm leading-relaxed">{item.desc}</p>
+            
+            {promotions.map((promo) => (
+              <div key={promo.id} className="gradient-card">
+                <span className="pill bg-white/20">HOT OFFER</span>
+                <h2 className="text-xl font-bold mt-3 leading-tight">{promo.title}</h2>
+                <p className="text-sm opacity-80 mt-2 mb-6 line-clamp-3">{promo.description}</p>
+                <div className="bg-white/10 rounded-2xl p-4 border border-white/20 text-center mb-6">
+                   <div className="text-3xl font-black">{promo.discount_pct}% OFF</div>
+                   <div className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">Book Today & Save</div>
+                </div>
+                <button 
+                  onClick={() => onNavigate({ page: 'business-detail', businessId: promo.business_id })}
+                  className="btn-white w-full flex items-center justify-center gap-2"
+                >
+                  View Special Offer <ArrowRight size={16} />
+                </button>
               </div>
             ))}
+
+            <div className="bg-white rounded-[24px] p-8 border border-[#E6EAF0] shadow-sm text-center h-fit">
+            <div className="w-16 h-16 bg-[#3A6FF8]/5 text-[#3A6FF8] rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Star size={30} />
+            </div>
+            <h3 className="text-xl font-black text-[#0F172A] mb-3 tracking-tight">Grow Your Business</h3>
+            <p className="text-sm text-[#6B7280] mb-8 leading-relaxed">
+              Join 500+ local businesses and start reaching thousands of customers today.
+            </p>
+            <button 
+              onClick={() => onNavigate({ page: 'admin-dashboard' })}
+              className="w-full py-4 bg-[#3A6FF8] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-blue-200 hover:scale-[1.02] active:scale-95 transition-all"
+            >
+              Get Started Now
+            </button>
+          </div>
+
           </div>
         </div>
-      </section>
+
+      </div>
+
+
     </div>
   );
 }

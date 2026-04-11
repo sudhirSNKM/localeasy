@@ -24,6 +24,20 @@ export default function BusinessDetail({ businessId, onNavigate }: BusinessDetai
       try {
         const biz = await dataService.getBusinessById(businessId);
         setBusiness(biz);
+        
+        // Save to Recently Viewed
+        if (biz) {
+          const recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+          const bizSnippet = { 
+            id: biz.id, 
+            name: biz.name, 
+            logo_url: biz.logo_url, 
+            rating: biz.rating, 
+            city: biz.city 
+          };
+          const filtered = recent.filter((r: any) => r.id !== biz.id).slice(0, 5);
+          localStorage.setItem('recentlyViewed', JSON.stringify([bizSnippet, ...filtered]));
+        }
       } catch (err) {
         console.error('Error loading business:', err);
       } finally {
@@ -60,181 +74,168 @@ export default function BusinessDetail({ businessId, onNavigate }: BusinessDetai
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-20">
-      {/* Hero Section */}
-      <div className="relative h-64 md:h-96 bg-neutral-200">
-        <img 
-          src={business.cover_url} 
-          alt={business.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+    <div className="min-h-screen bg-[#F2F4F7] py-6">
+      {/* Back Button */}
+      <div className="mb-6 flex items-center justify-between">
         <button 
           onClick={() => onNavigate({ page: 'home' })}
-          className="absolute top-24 left-4 md:left-8 bg-white/20 backdrop-blur-md text-white p-2.5 rounded-full hover:bg-white/30 transition-colors"
+          className="flex items-center gap-2 text-sm font-bold text-[#6B7280] hover:text-[#3A6FF8] transition-colors"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} /> Back to Discover
         </button>
+        <div className="flex gap-2">
+           <button className="w-10 h-10 bg-white rounded-xl border border-[#E6EAF0] flex items-center justify-center text-[#6B7280] hover:text-red-500 transition-colors shadow-sm">
+             <Heart size={18} />
+           </button>
+           <button className="w-10 h-10 bg-white rounded-xl border border-[#E6EAF0] flex items-center justify-center text-[#6B7280] hover:text-[#3A6FF8] transition-colors shadow-sm">
+             <Share2 size={18} />
+           </button>
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-3xl shadow-card p-6 md:p-8">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-                <div className="flex gap-4 md:gap-6">
-                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl md:rounded-3xl border-4 border-white shadow-lg overflow-hidden flex-shrink-0 bg-white -mt-12 md:-mt-16">
-                    <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="pt-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h1 className="text-2xl md:text-3xl font-bold text-neutral-900">{business.name}</h1>
-                      <ShieldCheck size={20} className="text-primary-600" />
-                    </div>
-                    <div className="flex items-center gap-4 text-sm font-medium">
-                      <div className="flex items-center gap-1 text-secondary-600">
-                        <Star size={16} fill="currentColor" />
-                        <span>{business.rating}</span>
-                        <span className="text-neutral-400">({business.review_count})</span>
-                      </div>
-                      <span className="text-neutral-300">•</span>
-                      <div className="flex items-center gap-1 text-neutral-500">
-                        <MapPin size={16} />
-                        <span>{business.city}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-700 hover:bg-neutral-50 transition-all">
-                    <Heart size={18} />
-                    Favorite
-                  </button>
-                  <button className="p-2.5 rounded-xl border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-all">
-                    <Share2 size={18} />
-                  </button>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Profile Card & Services */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          <div className="bg-white rounded-[24px] border border-[#E6EAF0] shadow-sm overflow-hidden">
+            {/* Cover and Profile Header */}
+            <div className="relative h-48 md:h-64">
+              <img src={business.cover_url} className="w-full h-full object-cover" alt="" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+            </div>
+            
+            <div className="p-6 md:p-8 flex flex-col md:flex-row gap-6">
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-3xl border-4 border-white shadow-lg overflow-hidden shrink-0 -mt-16 md:-mt-20 bg-white z-10">
+                <img src={business.logo_url} className="w-full h-full object-cover" alt="" />
               </div>
+              
+              <div className="flex-1">
+                 <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl md:text-3xl font-black text-[#0F172A] tracking-tight">{business.name}</h1>
+                    <ShieldCheck size={20} className="text-[#3A6FF8]" />
+                 </div>
+                 <div className="flex items-center gap-4 text-xs font-bold text-[#9AA4B2] uppercase tracking-widest">
+                    <div className="flex items-center gap-1 text-[#F59E0B]">
+                      <Star size={14} fill="currentColor" /> {business.rating} <span className="opacity-50">({business.review_count})</span>
+                    </div>
+                    <span>•</span>
+                    <div className="flex items-center gap-1"><MapPin size={14} /> {business.city}</div>
+                 </div>
+              </div>
+            </div>
 
-              {/* Tabs */}
-              <div className="flex gap-2 p-1 bg-neutral-100 rounded-2xl mb-8">
-                {(['services', 'promotions', 'info'] as const).map(tab => (
-                  <button
+            {/* In-page Tabs */}
+            <div className="flex px-6 md:px-8 border-t border-[#E6EAF0]">
+               {(['services', 'promotions', 'info'] as const).map(tab => (
+                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold capitalize transition-all ${
-                      activeTab === tab ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700'
+                    className={`py-4 px-4 text-[11px] font-black uppercase tracking-widest transition-all relative ${
+                      activeTab === tab ? 'text-[#3A6FF8]' : 'text-[#6B7280] hover:text-[#0F172A]'
                     }`}
-                  >
-                    {tab}
-                    {tab === 'services' && services.length > 0 && <span className="ml-1.5 opacity-50 text-xs">({services.length})</span>}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === 'services' && (
-                <div className="space-y-4">
-                  {services.length === 0 ? (
-                    <div className="text-center py-12 text-neutral-400">No services listed yet.</div>
-                  ) : (
-                    services.map(svc => (
-                      <div key={svc.id} className="group p-5 rounded-2xl border border-neutral-100 bg-neutral-50/30 hover:bg-white hover:border-primary-100 hover:shadow-card transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-neutral-900 mb-1 group-hover:text-primary-600 transition-colors">{svc.name}</h3>
-                          <p className="text-sm text-neutral-500 line-clamp-2">{svc.description}</p>
-                          <div className="flex items-center gap-4 mt-3 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                            <span className="flex items-center gap-1.5"><Clock size={14} /> {svc.duration} mins</span>
-                            <span className="flex items-center gap-1.5 text-primary-600"><IndianRupee size={14} /> ₹{svc.price}</span>
-                          </div>
-                        </div>
-                        <Button 
-                          onClick={() => onNavigate({ page: 'booking', businessId, serviceId: svc.id })}
-                          className="sm:w-auto"
-                        >
-                          Book Now
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'promotions' && (
-                <div className="space-y-4">
-                  {promotions.length === 0 ? (
-                    <div className="text-center py-12 text-neutral-400">No active promotions.</div>
-                  ) : (
-                    promotions.map(promo => (
-                      <div key={promo.id} className="p-6 rounded-3xl bg-gradient-to-br from-accent-50 to-white border border-accent-100">
-                        <div className="flex justify-between items-start mb-4">
-                          <Badge variant="accent">{promo.discount_pct}% OFF</Badge>
-                          <div className="text-xs font-bold text-accent-600 uppercase tracking-widest flex items-center gap-1.5">
-                            <Clock size={14} /> Limited Time
-                          </div>
-                        </div>
-                        <h3 className="text-xl font-bold text-neutral-900 mb-2">{promo.title}</h3>
-                        <p className="text-neutral-600 text-sm mb-6">{promo.description}</p>
-                        <Button variant="accent" fullWidth onClick={() => window.open(`https://wa.me/${business.whatsapp}?text=Hi, I want to claim the ${promo.title} offer!`, '_blank')}>
-                          Claim via WhatsApp
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'info' && (
-                <div className="space-y-8">
-                  <div>
-                    <h3 className="text-lg font-bold text-neutral-900 mb-4">About the Business</h3>
-                    <p className="text-neutral-600 leading-relaxed">{business.description}</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100">
-                      <h4 className="flex items-center gap-2 font-bold text-neutral-900 mb-3 text-sm uppercase tracking-wider">
-                        <MapPin size={16} className="text-primary-600" /> Location
-                      </h4>
-                      <p className="text-neutral-600 text-sm">{business.address}, {business.city}</p>
-                    </div>
-                    <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-100">
-                      <h4 className="flex items-center gap-2 font-bold text-neutral-900 mb-3 text-sm uppercase tracking-wider">
-                        <Clock size={16} className="text-primary-600" /> Business Hours
-                      </h4>
-                      <p className="text-neutral-600 text-sm">Mon - Sat: 9:00 AM - 8:00 PM<br />Sun: Closed</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                 >
+                   {tab}
+                   {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#3A6FF8] rounded-full" />}
+                 </button>
+               ))}
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl shadow-card p-6 border border-neutral-100 sticky top-24">
-              <h3 className="text-lg font-bold text-neutral-900 mb-6">Contact & Support</h3>
-              <div className="space-y-4">
-                <Button fullWidth onClick={() => window.open(`https://wa.me/${business.whatsapp}`, '_blank')} className="gap-2 bg-success-600 hover:bg-success-700">
-                   <MessageSquare size={18} /> Chat on WhatsApp
-                </Button>
-                <a href={`tel:${business.phone}`} className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-xl border border-neutral-200 text-sm font-bold text-neutral-700 hover:bg-neutral-50 transition-all">
-                  <Phone size={18} /> Call Us
-                </a>
-              </div>
-              <div className="mt-8 pt-8 border-t border-neutral-100">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-600">
-                    <Info size={18} />
-                  </div>
+          <div className="space-y-4">
+             {activeTab === 'services' && (
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {services.length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-[#9AA4B2] bg-white rounded-3xl border border-dashed border-[#E6EAF0]">No services listed yet.</div>
+                 ) : (
+                    services.map(svc => (
+                      <div key={svc.id} className="bg-white p-6 rounded-3xl border border-[#E6EAF0] shadow-sm hover:border-[#3A6FF8] transition-all group">
+                         <h3 className="font-bold text-[#0F172A] mb-2">{svc.name}</h3>
+                         <p className="text-xs text-[#6B7280] line-clamp-2 mb-6">{svc.description}</p>
+                         <div className="flex items-center justify-between">
+                            <div className="text-xs font-bold text-[#3A6FF8] bg-[#3A6FF8]/5 px-3 py-1.5 rounded-full">₹{svc.price} • {svc.duration}m</div>
+                            <button 
+                              onClick={() => onNavigate({ page: 'booking', businessId, serviceId: svc.id })}
+                              className="w-10 h-10 bg-[#3A6FF8] text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 active:scale-90 transition-all"
+                            >
+                              <Calendar size={18} />
+                            </button>
+                         </div>
+                      </div>
+                    ))
+                 )}
+               </div>
+             )}
+
+             {activeTab === 'promotions' && (
+               <div className="space-y-4">
+                 {promotions.length === 0 ? (
+                    <div className="py-12 text-center text-[#9AA4B2] bg-white rounded-3xl border border-dashed border-[#E6EAF0]">No active promotions.</div>
+                 ) : (
+                    promotions.map(promo => (
+                      <div key={promo.id} className="gradient-card">
+                         <div className="flex justify-between items-start mb-4">
+                            <span className="pill bg-white/20">{promo.discount_pct}% OFF DEAL</span>
+                            <Clock size={16} />
+                         </div>
+                         <h3 className="text-xl font-bold text-white mb-2">{promo.title}</h3>
+                         <p className="text-white/80 text-sm mb-6">{promo.description}</p>
+                         <button 
+                            onClick={() => window.open(`https://wa.me/${business.whatsapp}`, '_blank')}
+                            className="btn-white w-full"
+                         >
+                            Claim on WhatsApp
+                         </button>
+                      </div>
+                    ))
+                 )}
+               </div>
+             )}
+
+             {activeTab === 'info' && (
+               <div className="bg-white p-8 rounded-3xl border border-[#E6EAF0] shadow-sm space-y-8">
                   <div>
-                    <h4 className="font-bold text-neutral-900 text-sm">Verified Partner</h4>
-                    <p className="text-neutral-500 text-xs">Trusted provider since 2024</p>
+                    <h3 className="font-bold text-[#0F172A] mb-4 text-lg">About</h3>
+                    <p className="text-sm text-[#6B7280] leading-relaxed">{business.description}</p>
                   </div>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-[#E6EAF0]">
+                    <div>
+                      <h4 className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-[#3A6FF8] mb-3">📍 Location</h4>
+                      <p className="text-sm text-[#6B7280]">{business.address}, {business.city}</p>
+                    </div>
+                    <div>
+                      <h4 className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-[#3A6FF8] mb-3">🕒 Hours</h4>
+                      <p className="text-sm text-[#6B7280]">Mon - Sat: 9:00 AM - 8:00 PM</p>
+                    </div>
+                  </div>
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl p-8 border border-[#E6EAF0] shadow-sm sticky top-10">
+            <h3 className="font-bold text-[#0F172A] mb-6 text-lg">Book Service</h3>
+            <div className="space-y-4">
+               <button onClick={() => window.open(`https://wa.me/${business.whatsapp}`, '_blank')} className="btn-primary w-full shadow-lg shadow-blue-200 flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 border-none">
+                  <MessageSquare size={18} /> WhatsApp Contact
+               </button>
+               <a href={`tel:${business.phone}`} className="flex items-center justify-center gap-3 w-full py-4 rounded-xl border border-[#E6EAF0] text-sm font-bold text-[#6B7280] hover:bg-[#F2F4F7] transition-all">
+                 <Phone size={18} /> Call Business
+               </a>
+            </div>
+            
+            <div className="mt-8 pt-8 border-t border-[#E6EAF0] text-center">
+               <div className="w-12 h-12 bg-blue-50 text-[#3A6FF8] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <ShieldCheck size={24} />
+               </div>
+               <h4 className="font-bold text-[#0F172A] text-sm mb-1">Verified Provider</h4>
+               <p className="text-[#9AA4B2] text-xs">Trusted partner since 2024</p>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

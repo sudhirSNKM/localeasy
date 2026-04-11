@@ -71,6 +71,7 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
       await addDoc(collection(db, 'bookings'), {
         user_id: user.uid,
         user_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
+        user_email: user.email || '',
         user_phone: profile?.phone || '',
         user_avatar: profile?.avatar_url || '😊',
         business_id: businessId,

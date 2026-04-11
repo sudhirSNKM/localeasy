@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Building2, Plus, Edit2, Trash2, Star, Calendar, Briefcase, IndianRupee, Clock, Megaphone, MapPin, Phone } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Business, Service, Promotion, Category, NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
@@ -27,10 +28,30 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [showBizModal, setShowBizModal] = useState(false);
   const [showSvcModal, setShowSvcModal] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  const [uploading, setUploading] = useState<{ logo: boolean; cover: boolean }>({ logo: false, cover: false });
   const [editSvc, setEditSvc] = useState<Service | null>(null);
   const [editPromo, setEditPromo] = useState<Promotion | null>(null);
 
-  const [bizForm, setBizForm] = useState({ name: '', description: '', category_id: '', address: '', city: '', phone: '', whatsapp: '' });
+  const [bizForm, setBizForm] = useState({ 
+    name: '', 
+    description: '', 
+    category_id: '', 
+    address: '', 
+    city: '', 
+    phone: '', 
+    whatsapp: '', 
+    logo_url: '', 
+    cover_url: '',
+    working_hours: {
+      monday: { open: '09:00', close: '18:00', closed: false },
+      tuesday: { open: '09:00', close: '18:00', closed: false },
+      wednesday: { open: '09:00', close: '18:00', closed: false },
+      thursday: { open: '09:00', close: '18:00', closed: false },
+      friday: { open: '09:00', close: '18:00', closed: false },
+      saturday: { open: '09:00', close: '18:00', closed: false },
+      sunday: { open: '10:00', close: '16:00', closed: true },
+    }
+  });
   const [svcForm, setSvcForm] = useState({ name: '', description: '', price: '', duration: '60' });
   const [promoForm, setPromoForm] = useState({ title: '', description: '', discount_pct: '10', start_date: '', end_date: '' });
 
@@ -56,7 +77,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (!snapshot.empty) {
         const bizData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Business;
         setBusiness(bizData);
-        setBizForm(prev => ({ ...prev, ...bizData }));
+        setBizForm({
+          name: bizData.name || '',
+          description: bizData.description || '',
+          category_id: bizData.category_id || '',
+          address: bizData.address || '',
+          city: bizData.city || '',
+          phone: bizData.phone || '',
+          whatsapp: bizData.whatsapp || '',
+          logo_url: bizData.logo_url || '',
+          cover_url: bizData.cover_url || ''
+        });
         setLoading(false);
 
         unsubSvcs = onSnapshot(query(collection(db, 'services'), where('business_id', '==', bizData.id)), (s) => {
@@ -91,6 +122,35 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (unsubBkgs) unsubBkgs();
     };
   }, [user, profile]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Optional: Check size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large. Max 5MB.');
+      return;
+    }
+
+    setUploading(prev => ({ ...prev, [type]: true }));
+    try {
+      // Use a timestamp or unique ID if business doesn't exist yet, 
+      // otherwise use business.id
+      const folder = business?.id || `temp_${user.uid}`;
+      const fileRef = ref(storage, `businesses/${folder}/${type}_${Date.now()}`);
+      
+      const snapshot = await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      setBizForm(prev => ({ ...prev, [type === 'logo' ? 'logo_url' : 'cover_url']: url }));
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      alert('Upload failed: ' + err.message);
+    } finally {
+      setUploading(prev => ({ ...prev, [type]: false }));
+    }
+  };
 
   const saveBusiness = async () => {
     if (!user) return;
@@ -204,36 +264,47 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const tabs: Tab[] = ['overview', 'business', 'services', 'promotions', 'bookings'];
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="pt-28 pb-10">
+      <div className="w-full">
 
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between bg-white p-8 rounded-[32px] border border-[#E6EAF0] shadow-sm gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Business Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-0.5">{business?.name || 'Set up your business profile'}</p>
+            <h1 className="text-4xl font-black text-[#0F172A] tracking-tighter">Business Console</h1>
+            <p className="text-[#6B7280] text-sm font-medium mt-1">{business?.name || 'Set up your professional local presence'}</p>
           </div>
           {business && (
-            <Badge variant={business.status === 'approved' ? 'success' : business.status === 'rejected' ? 'error' : 'warning'}>
-              {business.status === 'approved' ? '✓ Live' : business.status === 'rejected' ? '✗ Rejected' : '⏳ Pending'}
-            </Badge>
+            <div className={`flex items-center self-start md:self-center px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border transition-all ${
+              business.status === 'approved' ? 'bg-[#3A6FF8]/5 text-[#3A6FF8] border-[#3A6FF8]/20' : 
+              business.status === 'rejected' ? 'bg-red-50 text-red-600 border-red-100' : 
+              'bg-amber-50 text-amber-600 border-amber-100'
+            }`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                business.status === 'approved' ? 'bg-[#3A6FF8] animate-pulse' : 
+                business.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
+              }`} />
+              {business.status === 'approved' ? 'Business Live' : business.status === 'rejected' ? 'Listing Rejected' : 'Review In Progress'}
+            </div>
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex overflow-x-auto pb-1 gap-1 mb-8 bg-gray-200/60 p-1 rounded-2xl w-fit">
+        {/* Navigation Tabs (3-Column Grid) */}
+        <div className="grid grid-cols-3 gap-2 mb-10 bg-white p-2 rounded-[24px] border border-[#E6EAF0] w-full shadow-sm">
           {tabs.map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-5 py-2 rounded-xl text-sm font-semibold capitalize transition-all whitespace-nowrap ${
-                activeTab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`py-3.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all text-center border ${
+                activeTab === t 
+                  ? 'bg-[#3A6FF8] text-white shadow-lg shadow-blue-200 border-[#3A6FF8]' 
+                  : 'text-[#6B7280] hover:text-[#0F172A] border-transparent hover:border-[#E6EAF0]'
               }`}
             >
-              {t === 'bookings' ? `Bookings (${bookings.length})` : t === 'services' ? `Services (${services.length})` : t === 'promotions' ? `Promotions (${promotions.length})` : t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'bookings' ? `Bookings` : t === 'services' ? `Services` : t === 'promotions' ? `Offers` : t}
             </button>
           ))}
         </div>
+
 
         {/* No Business CTA */}
         {!business ? (
@@ -261,17 +332,18 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
             {/* OVERVIEW TAB */}
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: 'Services', value: services.length, icon: <Briefcase size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: 'Bookings', value: bookings.length, icon: <Calendar size={20} />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { label: 'Rating', value: business.rating?.toFixed(1) || '—', icon: <Star size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { label: 'Promotions', value: promotions.length, icon: <Megaphone size={20} />, color: 'text-green-600', bg: 'bg-green-50' }
+                  { label: 'Services', value: services.length, icon: <Briefcase size={16} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { label: 'Bookings', value: bookings.length, icon: <Calendar size={16} />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                  { label: 'Rating', value: business.rating?.toFixed(1) || '—', icon: <Star size={16} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                  { label: 'Promotions', value: promotions.length, icon: <Megaphone size={16} />, color: 'text-green-600', bg: 'bg-green-50' },
+                  { label: 'Live Status', value: business.status === 'approved' ? 'Live' : 'Hidden', icon: <Clock size={16} />, color: 'text-sky-600', bg: 'bg-sky-50' }
                 ].map(stat => (
-                  <div key={stat.label} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-4`}>{stat.icon}</div>
-                    <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
-                    <div className="text-sm font-medium text-gray-400 mt-1">{stat.label}</div>
+                  <div key={stat.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center text-center">
+                    <div className={`w-8 h-8 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>{stat.icon}</div>
+                    <div className="text-xl font-black text-[#0F172A] leading-none">{stat.value}</div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{stat.label}</div>
                   </div>
                 ))}
 
@@ -433,14 +505,24 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-gray-900 text-sm">{b.user_name || 'Customer'}</div>
-                            {b.user_phone && (
-                              <a
-                                href={`tel:${b.user_phone}`}
-                                className="text-xs text-blue-600 font-semibold flex items-center gap-1 mt-0.5 hover:underline"
-                              >
-                                📞 {b.user_phone}
-                              </a>
-                            )}
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-0.5">
+                              {b.user_phone && (
+                                <a
+                                  href={`tel:${b.user_phone}`}
+                                  className="text-[11px] text-blue-600 font-bold flex items-center gap-1 hover:underline bg-blue-50 px-1.5 py-0.5 rounded"
+                                >
+                                  📞 {b.user_phone}
+                                </a>
+                              )}
+                              {b.user_email && (
+                                <a
+                                  href={`mailto:${b.user_email}`}
+                                  className="text-[11px] text-purple-600 font-bold flex items-center gap-1 hover:underline bg-purple-50 px-1.5 py-0.5 rounded"
+                                >
+                                  ✉️ {b.user_email}
+                                </a>
+                              )}
+                            </div>
                             <div className="text-sm font-semibold text-purple-600 mt-1">{b.service_name}</div>
                             <div className="text-xs text-gray-400 mt-0.5">
                               📅 {b.date} · ⏰ {b.time || b.time_slot}
@@ -500,6 +582,112 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 </div>
                 <input value={bizForm.whatsapp} onChange={e => setBizForm({ ...bizForm, whatsapp: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="WhatsApp Number (e.g. 919999988888)" />
                 <input value={bizForm.address} onChange={e => setBizForm({ ...bizForm, address: e.target.value })} className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Full Address" />
+                
+                <div className="pt-4 mt-4 border-t border-gray-100">
+                  <h4 className="text-xs font-black text-[#0F172A] uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Clock size={14} className="text-[#3A6FF8]" /> Weekly Operating Hours
+                  </h4>
+                  <div className="space-y-3">
+                    {Object.entries(bizForm.working_hours).map(([day, hours]) => (
+                      <div key={day} className="flex items-center gap-4 bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
+                        <div className="w-24 text-[10px] font-black uppercase text-[#6B7280] tracking-tighter">{day}</div>
+                        <div className="flex-1 flex items-center gap-2">
+                          <input 
+                            type="time" 
+                            value={hours.open} 
+                            disabled={hours.closed}
+                            onChange={(e) => setBizForm({
+                              ...bizForm,
+                              working_hours: { ...bizForm.working_hours, [day]: { ...hours, open: e.target.value } }
+                            })}
+                            className="bg-white px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-blue-500 disabled:opacity-30"
+                          />
+                          <span className="text-gray-300 text-xs">to</span>
+                          <input 
+                            type="time" 
+                            value={hours.close} 
+                            disabled={hours.closed}
+                            onChange={(e) => setBizForm({
+                              ...bizForm,
+                              working_hours: { ...bizForm.working_hours, [day]: { ...hours, close: e.target.value } }
+                            })}
+                            className="bg-white px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:ring-1 focus:ring-blue-500 disabled:opacity-30"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                           <input 
+                             type="checkbox" 
+                             checked={hours.closed}
+                             onChange={(e) => setBizForm({
+                              ...bizForm,
+                              working_hours: { ...bizForm.working_hours, [day]: { ...hours, closed: e.target.checked } }
+                             })}
+                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                           />
+                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:text-red-500 transition-colors">Closed</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase ml-1">Business Logo</label>
+                    <div className="relative group">
+                      <div className="w-full h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center transition-colors group-hover:border-blue-400 overflow-hidden">
+                        {bizForm.logo_url ? (
+                          <img src={bizForm.logo_url} className="w-full h-full object-cover" alt="Logo" />
+                        ) : (
+                          <div className="text-center p-4">
+                            <Plus size={20} className="text-gray-400 mx-auto mb-1" />
+                            <span className="text-[10px] font-bold text-gray-400">UPLOAD LOGO</span>
+                          </div>
+                        )}
+                        {uploading.logo && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent animate-spin rounded-full" />
+                          </div>
+                        )}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer" 
+                          onChange={(e) => handleImageUpload(e, 'logo')}
+                          disabled={uploading.logo}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-500 uppercase ml-1">Cover Banner</label>
+                    <div className="relative group">
+                      <div className="w-full h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center transition-colors group-hover:border-blue-400 overflow-hidden">
+                        {bizForm.cover_url ? (
+                          <img src={bizForm.cover_url} className="w-full h-full object-cover" alt="Banner" />
+                        ) : (
+                          <div className="text-center p-4">
+                            <Plus size={20} className="text-gray-400 mx-auto mb-1" />
+                            <span className="text-[10px] font-bold text-gray-400">UPLOAD BANNER</span>
+                          </div>
+                        )}
+                        {uploading.cover && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent animate-spin rounded-full" />
+                          </div>
+                        )}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer" 
+                          onChange={(e) => handleImageUpload(e, 'cover')}
+                          disabled={uploading.cover}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="p-6 bg-gray-50/50 flex gap-3">
                 <Button onClick={saveBusiness} loading={saving} fullWidth>Save Business</Button>

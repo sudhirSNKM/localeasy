@@ -72,96 +72,90 @@ export default function Browse({ onNavigate }: BrowseProps) {
   const hasFilters = search || selectedCategory || cityFilter;
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16">
+    <div className="min-h-screen pt-4">
       {/* Sticky Filter Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-16 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search businesses or services..."
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+      <div className="bg-[#F2F4F7] sticky top-0 md:top-4 z-30 pb-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3A6FF8]" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search services or locations..."
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-[#E6EAF0] text-sm focus:outline-none focus:ring-2 focus:ring-[#3A6FF8] shadow-sm bg-white"
+            />
+          </div>
+          <div className="relative">
             <input
               value={cityFilter}
               onChange={e => setCityFilter(e.target.value)}
-              placeholder="Filter by city..."
-              className="sm:w-40 px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="City..."
+              className="w-full sm:w-48 px-4 py-3.5 rounded-2xl border border-[#E6EAF0] text-sm focus:outline-none focus:ring-2 focus:ring-[#3A6FF8] shadow-sm bg-white"
             />
-            {hasFilters && (
-              <button
-                onClick={() => { setSearch(''); setSelectedCategory(''); setCityFilter(''); }}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-xl transition-colors"
-              >
-                <X size={14} /> Clear
-              </button>
-            )}
           </div>
-
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+          {hasFilters && (
             <button
-              onClick={() => setSelectedCategory('')}
-              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex-shrink-0 ${
-                !selectedCategory ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              onClick={() => { setSearch(''); setSelectedCategory(''); setCityFilter(''); }}
+              className="btn-white px-6 flex items-center gap-2 border border-[#E6EAF0] hover:border-[#3A6FF8]"
+            >
+              <X size={16} /> Clear
+            </button>
+          )}
+        </div>
+
+        <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
+          <button
+            onClick={() => setSelectedCategory('')}
+            className={`whitespace-nowrap px-6 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm ${
+              !selectedCategory ? 'bg-[#3A6FF8] text-white' : 'bg-white text-[#6B7280] hover:text-[#3A6FF8]'
+            }`}
+          >
+            All
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
+              className={`whitespace-nowrap px-6 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all shadow-sm ${
+                selectedCategory === cat.id ? 'bg-[#3A6FF8] text-white' : 'bg-white text-[#6B7280] hover:text-[#3A6FF8]'
               }`}
             >
-              All
+              {cat.name}
             </button>
-            {categories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
-                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors flex-shrink-0 ${
-                  selectedCategory === cat.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-gray-500">
-            {loading ? 'Loading...' : `${filteredBusinesses.length} business${filteredBusinesses.length !== 1 ? 'es' : ''} found`}
+      <div className="py-2">
+        <div className="flex items-center justify-between mb-8">
+          <p className="text-sm font-bold text-[#0F172A] uppercase tracking-widest opacity-40">
+            {loading ? 'Finding services...' : `${filteredBusinesses.length} Results`}
           </p>
-          <div className="flex items-center gap-1.5 text-sm text-gray-400">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#9AA4B2] uppercase tracking-widest">
             <SlidersHorizontal size={14} /> Sorted by rating
           </div>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
-                <div className="h-48 bg-gray-200" />
-                <div className="p-4 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="card-soft h-64 animate-pulse" />
             ))}
           </div>
         ) : filteredBusinesses.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 mb-12">
             {filteredBusinesses.map(b => (
               <BusinessCard key={b.id} business={b} onNavigate={onNavigate} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Search size={24} className="text-gray-400" />
+          <div className="text-center py-24 bg-white rounded-3xl border border-[#E6EAF0]">
+            <div className="w-20 h-20 bg-[#F2F4F7] rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <Search size={32} className="text-[#9AA4B2]" />
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">No businesses found</h3>
-            <p className="text-gray-500 text-sm">
-              {hasFilters ? 'Try adjusting your search or filters.' : 'No approved businesses yet. Check back soon!'}
+            <h3 className="text-xl font-bold text-[#0F172A] mb-2 leading-tight">No businesses found</h3>
+            <p className="text-[#6B7280] text-sm max-w-xs mx-auto">
+              {hasFilters ? 'Try adjusting your search criteria or explore other categories.' : 'We haven\'t added any businesses here yet.'}
             </p>
           </div>
         )}

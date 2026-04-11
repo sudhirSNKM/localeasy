@@ -54,72 +54,7 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
     return () => { unsubBiz(); unsubUsers(); };
   }, [user, profile]);
 
-  const handleSeedData = async () => {
-    setSeeding(true);
-    setSeedMsg('Seeding categories...');
-    try {
-      const categories = [
-        { id: 'cat_hair', name: 'Hair & Beauty', icon: 'scissors', color: '#ec4899', description: 'Salons, Barbershops' },
-        { id: 'cat_health', name: 'Healthcare', icon: 'smile', color: '#ef4444', description: 'Doctors, Clinics' },
-        { id: 'cat_food', name: 'Food & Dining', icon: 'utensils', color: '#f59e0b', description: 'Restaurants, Cafes' },
-        { id: 'cat_fitness', name: 'Fitness', icon: 'dumbbell', color: '#10b981', description: 'Gyms, Yoga' },
-        { id: 'cat_home', name: 'Home Services', icon: 'home', color: '#3b82f6', description: 'Plumbing, Cleaning' },
-        { id: 'cat_auto', name: 'Automotive', icon: 'car', color: '#6366f1', description: 'Car service, Wash' },
-        { id: 'cat_beauty', name: 'Wellness & Spa', icon: 'sparkles', color: '#8b5cf6', description: 'Spas, Massage' },
-        { id: 'cat_photo', name: 'Photography', icon: 'camera', color: '#0ea5e9', description: 'Studios, Events' },
-      ];
-      for (const cat of categories) {
-        await setDoc(doc(db, 'categories', cat.id), { ...cat, created_at: new Date().toISOString() });
-      }
 
-      setSeedMsg('Seeding businesses...');
-      const sampleBiz = [
-        {
-          id: 'biz_demo_1',
-          owner_id: user?.uid || 'demo',
-          name: 'Style Studio',
-          description: 'Premium hair salon with expert stylists for all hair types.',
-          category_id: 'cat_hair',
-          address: '12 MG Road',
-          city: 'Bangalore',
-          phone: '+91 98765 00001',
-          whatsapp: '919876500001',
-          logo_url: 'https://images.pexels.com/photos/3992656/pexels-photo-3992656.jpeg?w=200&h=200&fit=crop',
-          cover_url: 'https://images.pexels.com/photos/3992656/pexels-photo-3992656.jpeg?w=800&h=400&fit=crop',
-          status: 'approved',
-          rating: 4.9,
-          review_count: 210,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'biz_demo_2',
-          owner_id: user?.uid || 'demo',
-          name: 'City Dental Care',
-          description: 'Modern dental clinic with painless treatments and expert dentists.',
-          category_id: 'cat_health',
-          address: '45 Anna Salai',
-          city: 'Chennai',
-          phone: '+91 98765 00002',
-          whatsapp: '919876500002',
-          logo_url: 'https://images.pexels.com/photos/1813504/pexels-photo-1813504.jpeg?w=200&h=200&fit=crop',
-          cover_url: 'https://images.pexels.com/photos/1813504/pexels-photo-1813504.jpeg?w=800&h=400&fit=crop',
-          status: 'approved',
-          rating: 4.7,
-          review_count: 158,
-          created_at: new Date().toISOString()
-        }
-      ];
-      for (const biz of sampleBiz) {
-        await setDoc(doc(db, 'businesses', biz.id), biz);
-      }
-
-      setSeedMsg('✓ Seed complete! Categories and sample businesses added.');
-    } catch (err: any) {
-      setSeedMsg('❌ Error: ' + err.message);
-    } finally {
-      setSeeding(false);
-    }
-  };
 
   const updateBizStatus = async (id: string, status: 'approved' | 'rejected') => {
     setUpdating(id);
@@ -182,20 +117,24 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
         {/* Tab Bar + Search */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="flex gap-1 bg-gray-200/50 rounded-xl p-1">
-            {(['businesses', 'users', 'database'] as const).map(t => (
+            {(['businesses', 'users'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-5 py-2 rounded-lg text-sm font-bold capitalize transition-all ${
+                className={`px-5 py-2 rounded-lg text-sm font-bold capitalize transition-all flex items-center gap-2 ${
                   tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 {t}
+                {t === 'businesses' && stats.pending > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {stats.pending}
+                  </span>
+                )}
               </button>
             ))}
           </div>
-          {tab !== 'database' && (
-            <div className="relative flex-1">
+          <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
@@ -204,7 +143,6 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          )}
         </div>
 
         {/* BUSINESSES TAB */}
@@ -312,26 +250,7 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
           </div>
         )}
 
-        {/* DATABASE TAB */}
-        {tab === 'database' && (
-          <div className="bg-white rounded-2xl shadow-sm p-10 border border-gray-100 text-center">
-            <Database size={48} className="text-gray-200 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Database Utilities</h2>
-            <p className="text-gray-400 mb-8 max-w-sm mx-auto text-sm">
-              Seed your Firestore database with sample categories and demo businesses so the home page is never empty.
-            </p>
-            <div className="flex flex-col items-center gap-4 max-w-xs mx-auto">
-              <Button onClick={handleSeedData} loading={seeding} fullWidth size="lg">
-                Seed Demo Data
-              </Button>
-              {seedMsg && (
-                <p className={`text-sm font-medium ${seedMsg.startsWith('❌') ? 'text-red-500' : 'text-blue-600'}`}>
-                  {seedMsg}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+
 
       </div>
     </div>

@@ -20,6 +20,7 @@ export type Page =
   | 'user-dashboard'
   | 'admin-dashboard'
   | 'super-admin'
+  | 'admin-analysis'
   | 'profile';
 
 export interface NavState {

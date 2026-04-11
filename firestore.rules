@@ -1,49 +1,109 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper to check if user is a super admin
-    function isSuperAdmin() {
-      return request.auth != null && 
-        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'super_admin';
+
+    // ─── Helper Functions ─────────────────────────────────────────────────────
+
+    // Is the request from a logged-in user?
+    function isAuth() {
+      return request.auth != null;
     }
 
-    // Profiles
+    // Is this the correct user's own document?
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // ─── PROFILES ─────────────────────────────────────────────────────────────
+    // - Any logged-in user can read any profile (for display purposes)
+    // - A user can only write their own profile
+    // - Super admin role can only be set server-side (via Firebase Admin SDK),
+    //   so we prevent any client from self-assigning 'super_admin'
     match /profiles/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+      allow read: if isAuth();
+
+      // Create: must be their own doc, role cannot be 'super_admin'
+      allow create: if isOwner(userId)
+        && request.resource.data.role != 'super_admin';
+
+      // Update: own profile, cannot escalate role to super_admin
+      allow update: if isOwner(userId)
+        && request.resource.data.role != 'super_admin';
     }
 
-    // Categories are public read, admin write
-    match /categories/{category} {
+    // ─── CATEGORIES ───────────────────────────────────────────────────────────
+    // - Public read (used on home page, browse page, business forms)
+    // - Only authenticated users can write (Super Admin seeds via app)
+    match /categories/{catId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
-    }
-    
-    // Businesses
-    match /businesses/{business} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        (request.auth.uid == resource.data.owner_id || isSuperAdmin());
+      allow write: if isAuth();
     }
 
-    // Bookings
-    match /bookings/{bookingId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.user_id || 
-         request.auth.uid == resource.data.business_owner_id || 
-         isSuperAdmin());
+    // ─── BUSINESSES ───────────────────────────────────────────────────────────
+    // - Public read (home page shows approved businesses to everyone)
+    // - Logged-in user can create (becomes owner)
+    //   → owner_id in the new doc MUST match the creating user's UID
+    // - Only the owner or super_admin can update/delete
+    match /businesses/{bizId} {
+      allow read: if true;
+
+      // Create: logged in + the owner_id field must be yourself
+      allow create: if isAuth()
+        && request.resource.data.owner_id == request.auth.uid;
+
+      // Update/Delete: only the owner
+      allow update, delete: if isAuth()
+        && resource.data.owner_id == request.auth.uid;
     }
 
-    // Services & Promotions
-    match /services/{serviceId} {
+    // ─── SERVICES ─────────────────────────────────────────────────────────────
+    // - Public read (displayed on business detail page)
+    // - Only logged-in users (business owners) can write
+    match /services/{svcId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAuth();
     }
-    
+
+    // ─── PROMOTIONS ───────────────────────────────────────────────────────────
+    // - Public read (displayed on home page carousel and business detail)
+    // - Only logged-in users (business owners) can write
     match /promotions/{promoId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAuth();
+    }
+
+    // ─── BOOKINGS ─────────────────────────────────────────────────────────────
+    // - A logged-in user can CREATE a booking
+    //   → The user_id field in the new booking MUST match their own UID
+    // - A user can READ their own bookings (user dashboard)
+    // - A business owner can READ bookings for their business
+    // - A user can UPDATE (cancel) their own booking
+    // - A business owner can UPDATE (confirm/complete) bookings for their business
+    match /bookings/{bookingId} {
+
+      // CREATE: logged in, and user_id in the new document = their UID
+      allow create: if isAuth()
+        && request.resource.data.user_id == request.auth.uid;
+
+      // READ: either the customer OR the business owner (looked up via business doc)
+      allow read: if isAuth()
+        && (
+          resource.data.user_id == request.auth.uid
+          ||
+          get(/databases/$(database)/documents/businesses/$(resource.data.business_id)).data.owner_id == request.auth.uid
+        );
+
+      // UPDATE: customer can cancel their own. Business owner can confirm/complete.
+      allow update: if isAuth()
+        && (
+          resource.data.user_id == request.auth.uid
+          ||
+          get(/databases/$(database)/documents/businesses/$(resource.data.business_id)).data.owner_id == request.auth.uid
+        );
+
+      // DELETE: only the customer who made it
+      allow delete: if isAuth()
+        && resource.data.user_id == request.auth.uid;
     }
   }
 }
