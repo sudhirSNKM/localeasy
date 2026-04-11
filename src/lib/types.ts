@@ -19,7 +19,8 @@ export type Page =
   | 'auth'
   | 'user-dashboard'
   | 'admin-dashboard'
-  | 'super-admin';
+  | 'super-admin'
+  | 'profile';
 
 export interface NavState {
   page: Page;

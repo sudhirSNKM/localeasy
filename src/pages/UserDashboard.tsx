@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
-import type { BookingWithDetails, NavState } from '../lib/types';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import type { NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -29,9 +29,12 @@ export default function UserDashboard({ onNavigate }: UserDashboardProps) {
     
     const loadBookings = async () => {
       try {
-        const q = query(collection(db, 'bookings'), where('user_id', '==', user.uid), orderBy('date', 'desc'));
+        const q = query(collection(db, 'bookings'), where('user_id', '==', user.uid));
         const snapshot = await getDocs(q);
-        setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Sort by date descending client-side (no index needed)
+        data.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+        setBookings(data);
       } catch (err) {
         console.error('Error loading user bookings:', err);
       } finally {

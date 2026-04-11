@@ -11,16 +11,17 @@ import Auth from './pages/Auth';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import SuperAdmin from './pages/SuperAdmin';
+import ProfilePage from './pages/ProfilePage';
 
 function AppContent() {
   const [nav, setNav] = useState<NavState>(() => {
-    // Basic URL parsing for initial load
     const path = window.location.pathname.split('/').filter(Boolean);
     if (path[0] === 'browse') return { page: 'browse' };
     if (path[0] === 'auth') return { page: 'auth' };
     if (path[0] === 'super-admin') return { page: 'super-admin' };
     if (path[0] === 'admin-dashboard') return { page: 'admin-dashboard' };
     if (path[0] === 'dashboard') return { page: 'user-dashboard' };
+    if (path[0] === 'profile') return { page: 'profile' };
     if (path[0] === 'business' && path[1]) return { page: 'business-detail', businessId: path[1] };
     if (path[0] === 'book' && path[1] && path[2]) return { page: 'booking', businessId: path[1], serviceId: path[2] };
     return { page: 'home' };
@@ -28,8 +29,6 @@ function AppContent() {
 
   const handleNavigate = (state: NavState, push = true) => {
     setNav(state);
-    
-    // Update URL
     if (push) {
       let url = '/';
       if (state.page === 'browse') url = '/browse';
@@ -37,15 +36,14 @@ function AppContent() {
       if (state.page === 'super-admin') url = '/super-admin';
       if (state.page === 'admin-dashboard') url = '/admin-dashboard';
       if (state.page === 'user-dashboard') url = '/dashboard';
+      if (state.page === 'profile') url = '/profile';
       if (state.page === 'business-detail') url = `/business/${state.businessId}`;
       if (state.page === 'booking') url = `/book/${state.businessId}/${state.serviceId}`;
       window.history.pushState(state, '', url);
     }
-    
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       if (e.state) handleNavigate(e.state, false);
@@ -77,6 +75,8 @@ function AppContent() {
         return <AdminDashboard onNavigate={handleNavigate} />;
       case 'super-admin':
         return <SuperAdmin onNavigate={handleNavigate} />;
+      case 'profile':
+        return <ProfilePage onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }

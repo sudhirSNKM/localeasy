@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, Plus, Edit2, Trash2, Star, TrendingUp, Calendar, Briefcase, MessageSquare, IndianRupee, Clock, MapPin, Phone, Megaphone } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Star, Calendar, Briefcase, IndianRupee, Clock, Megaphone, MapPin, Phone } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import type { Business, Service, Promotion, Category, NavState } from '../lib/types';
@@ -245,7 +245,16 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             <p className="text-gray-500 mb-8 max-w-sm mx-auto text-sm">
               List your services, manage bookings, and reach thousands of local customers. Your listing will be reviewed before going live.
             </p>
-            <Button size="lg" onClick={() => setShowBizModal(true)}>List My Business</Button>
+            {/* Gate: profile must be complete before listing */}
+            {profile && (!profile.phone || profile.phone.length < 10) ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-left">
+                <div className="font-bold text-amber-800 text-sm mb-1">⚠️ Complete your profile first</div>
+                <p className="text-amber-700 text-xs mb-3">Your phone number is required before you can list a business.</p>
+                <Button size="sm" onClick={() => onNavigate({ page: 'profile' })}>Complete Profile →</Button>
+              </div>
+            ) : (
+              <Button size="lg" onClick={() => setShowBizModal(true)}>List My Business</Button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -410,21 +419,49 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 </div>
                 <div className="divide-y divide-gray-50">
                   {bookings.length === 0 ? (
-                    <div className="p-16 text-center text-gray-400 text-sm">No bookings yet.</div>
+                    <div className="p-16 text-center">
+                      <Calendar size={32} className="text-gray-200 mx-auto mb-3" />
+                      <p className="text-gray-400 text-sm">No bookings yet. Share your business to get started!</p>
+                    </div>
                   ) : (
                     bookings.map(b => (
-                      <div key={b.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex gap-4">
-                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 font-bold text-sm shrink-0">
-                            {(b.user_name || 'C').charAt(0).toUpperCase()}
+                      <div key={b.id} className="p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                        {/* Customer info */}
+                        <div className="flex gap-4 flex-1 min-w-0">
+                          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl shrink-0">
+                            {b.user_avatar || '😊'}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <div className="font-bold text-gray-900 text-sm">{b.user_name || 'Customer'}</div>
-                            <div className="text-sm text-blue-600 font-semibold">{b.service_name}</div>
-                            <div className="text-xs text-gray-400 mt-0.5">{b.date} • {b.time || b.time_slot}</div>
+                            {b.user_phone && (
+                              <a
+                                href={`tel:${b.user_phone}`}
+                                className="text-xs text-blue-600 font-semibold flex items-center gap-1 mt-0.5 hover:underline"
+                              >
+                                📞 {b.user_phone}
+                              </a>
+                            )}
+                            <div className="text-sm font-semibold text-purple-600 mt-1">{b.service_name}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              📅 {b.date} · ⏰ {b.time || b.time_slot}
+                            </div>
+                            {b.notes && (
+                              <div className="text-xs text-gray-400 mt-1 italic">"{b.notes}"</div>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          {b.user_phone && (
+                            <a
+                              href={`https://wa.me/${b.user_phone.replace(/\D/g, '')}?text=Hi ${b.user_name}, your booking for ${b.service_name} on ${b.date} at ${b.time || b.time_slot} is confirmed!`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+                            >
+                              WhatsApp
+                            </a>
+                          )}
                           {b.status === 'pending' && (
                             <Button size="sm" onClick={() => updateBookingStatus(b.id, 'confirmed')}>Confirm</Button>
                           )}

@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut, 
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { Profile } from '../lib/types';
 
@@ -22,6 +22,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const SUPER_ADMIN_EMAIL = 'superadmin@localeasy.com';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -31,15 +33,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const docRef = doc(db, 'profiles', userId);
       const docSnap = await getDoc(docRef);
+      
       if (docSnap.exists()) {
-        setProfile(docSnap.data() as Profile);
+        const data = docSnap.data() as Profile;
+        
+        // Fix: if the super admin email matches, ensure their role is correct
+        if (firebaseUser.email === SUPER_ADMIN_EMAIL && data.role !== 'super_admin') {
+          await updateDoc(docRef, { role: 'super_admin' });
+          setProfile({ ...data, role: 'super_admin' });
+        } else {
+          setProfile(data);
+        }
       } else {
-        // Self-healing: Create a default profile if it doesn't exist
-        // This is useful for demo accounts or first-time logins
+        // No profile exists — create one with correct default role
+        // Only the specific super admin email gets super_admin role
+        const correctRole = firebaseUser.email === SUPER_ADMIN_EMAIL ? 'super_admin' : 'user';
+        
         const defaultProfile: Profile = {
           id: userId,
           full_name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-          role: firebaseUser.email?.includes('admin') ? 'super_admin' : 'user',
+          role: correctRole,
           phone: '',
           avatar_url: '',
           created_at: new Date().toISOString()
@@ -76,25 +89,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithEmailAndPassword(auth, email, password);
       return { error: null };
     } catch (err: any) {
-      return { error: err.message || 'Failed to sign in' };
+      let message = 'Failed to sign in';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        message = 'Invalid email or password';
+      } else if (err.code === 'auth/invalid-email') {
+        message = 'Invalid email address';
+      } else if (err.code === 'auth/too-many-requests') {
+        message = 'Too many attempts. Please try again later.';
+      }
+      return { error: message };
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: 'user' | 'admin') => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const newUser = userCredential.user;
+
+      // Ensure super admin email always gets super_admin role
+      const finalRole = email === SUPER_ADMIN_EMAIL ? 'super_admin' : role;
 
       const profileData: Profile = {
-        id: user.uid,
+        id: newUser.uid,
         full_name: fullName,
         phone: '',
-        role: role as any,
+        role: finalRole as any,
         avatar_url: '',
         created_at: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'profiles', user.uid), {
+      await setDoc(doc(db, 'profiles', newUser.uid), {
         ...profileData,
         created_at: serverTimestamp()
       });
@@ -102,12 +126,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(profileData);
       return { error: null };
     } catch (err: any) {
-      return { error: err.message || 'Failed to sign up' };
+      let message = 'Failed to sign up';
+      if (err.code === 'auth/email-already-in-use') {
+        message = 'This email is already registered. Please sign in.';
+      } else if (err.code === 'auth/weak-password') {
+        message = 'Password must be at least 6 characters.';
+      } else if (err.code === 'auth/invalid-email') {
+        message = 'Invalid email address.';
+      }
+      return { error: message };
     }
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setProfile(null);
   };
 
   return (
@@ -122,4 +155,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-

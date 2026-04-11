@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Calendar, Clock, CheckCircle, MessageCircle, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, CheckCircle, MessageCircle, IndianRupee, Phone, UserCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import type { Business, Service, NavState } from '../lib/types';
@@ -19,7 +19,7 @@ const TIME_SLOTS = [
 ];
 
 export default function Booking({ businessId, serviceId, onNavigate }: BookingProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [business, setBusiness] = useState<Business | null>(null);
   const [service, setService] = useState<Service | null>(null);
   const [date, setDate] = useState('');
@@ -29,6 +29,9 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
   const [pageLoading, setPageLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  // Profile must be complete (name + phone) to book
+  const profileComplete = profile && profile.full_name && profile.phone && profile.phone.length >= 10;
 
   useEffect(() => {
     if (!user) { onNavigate({ page: 'auth' }); return; }
@@ -59,6 +62,7 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
     e.preventDefault();
     if (!date || !timeSlot) { setError('Please select a date and time slot.'); return; }
     if (!user || !business || !service) return;
+    if (!profileComplete) { setError('Please complete your profile before booking.'); return; }
 
     setLoading(true);
     setError('');
@@ -66,12 +70,14 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
     try {
       await addDoc(collection(db, 'bookings'), {
         user_id: user.uid,
-        user_name: user.displayName || user.email?.split('@')[0] || 'Customer',
+        user_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
+        user_phone: profile?.phone || '',
+        user_avatar: profile?.avatar_url || '😊',
         business_id: businessId,
         service_id: serviceId,
         service_name: service.name,
         business_name: business.name,
-        business_whatsapp: business.whatsapp,
+        business_whatsapp: business.whatsapp || '',
         price: service.price,
         date,
         time: timeSlot,
@@ -82,6 +88,7 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
       });
       setSuccess(true);
     } catch (err: any) {
+      console.error('Firestore Booking Error:', err);
       setError(err.message || 'Failed to create booking');
     } finally {
       setLoading(false);
@@ -104,17 +111,42 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
     );
   }
 
+  // Gate: require profile completion before booking
+  if (!profileComplete) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+          <div className="text-5xl mb-4">👤</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Complete Your Profile First</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            We need your name and phone number to confirm bookings and let businesses contact you.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => onNavigate({ page: 'profile' })} fullWidth size="lg">
+              <UserCircle size={16} /> Complete My Profile
+            </Button>
+            <Button onClick={() => onNavigate({ page: 'business-detail', businessId })} variant="ghost" fullWidth>
+              <ArrowLeft size={16} /> Go Back
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Your booking for <strong>{service?.name}</strong> at <strong>{business?.name}</strong> on{' '}
-            {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {timeSlot} has been submitted.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed! 🎉</h2>
+          <p className="text-gray-500 text-sm mb-2">
+            <strong>{service?.name}</strong> at <strong>{business?.name}</strong>
+          </p>
+          <p className="text-gray-400 text-sm mb-6">
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {timeSlot}
           </p>
           <div className="flex flex-col gap-3">
             {business?.whatsapp && (
@@ -146,8 +178,18 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
 
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Book Appointment</h1>
 
+        {/* Customer info strip */}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4 flex items-center gap-3">
+          <div className="text-2xl">{profile?.avatar_url || '😊'}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-blue-600 font-bold uppercase tracking-wider">Booking as</div>
+            <div className="font-bold text-gray-900 text-sm truncate">{profile?.full_name}</div>
+            <div className="text-xs text-gray-500 flex items-center gap-1"><Phone size={10} />{profile?.phone}</div>
+          </div>
+        </div>
+
         {service && business && (
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex items-center gap-4">
+          <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 flex items-center gap-4 shadow-sm">
             <div className="flex-1">
               <div className="text-xs text-blue-600 font-semibold mb-1 uppercase tracking-wider">{business.name}</div>
               <div className="font-bold text-gray-900 text-lg">{service.name}</div>
@@ -164,8 +206,7 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              <Calendar size={14} className="inline mr-1.5" />
-              Select Date
+              <Calendar size={14} className="inline mr-1.5" />Select Date
             </label>
             <input
               type="date"
@@ -173,14 +214,13 @@ export default function Booking({ businessId, serviceId, onNavigate }: BookingPr
               onChange={e => setDate(e.target.value)}
               min={minDateStr}
               required
-              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-3">
-              <Clock size={14} className="inline mr-1.5" />
-              Select Time Slot
+              <Clock size={14} className="inline mr-1.5" />Select Time Slot
             </label>
             <div className="grid grid-cols-4 gap-2">
               {TIME_SLOTS.map(slot => (
