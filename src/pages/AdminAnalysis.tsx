@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BarChart2, TrendingUp, Users, DollarSign, Calendar, Sparkles, Clock } from 'lucide-react';
+import { BarChart2, TrendingUp, Users, Calendar, Sparkles, Clock } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
@@ -107,7 +107,6 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
   }
 
   const cards = [
-    { label: 'Total Revenue', value: `₹${stats.totalRevenue}`, icon: <DollarSign size={20} />, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Total Bookings', value: stats.totalBookings, icon: <Calendar size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Unique Customers', value: stats.newCustomers, icon: <Users size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
     { label: 'Completion Rate', value: `${stats.conversionRate.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: 'text-amber-600', bg: 'bg-amber-50' },
