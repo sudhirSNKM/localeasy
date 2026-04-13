@@ -18,69 +18,73 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
     conversionRate: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState<number[]>([30, 45, 35, 60, 55, 80, 75]);
+  const [chartData, setChartData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
 
   useEffect(() => {
     if (!user) return;
 
-    const fetchAnalysis = async () => {
+    let unsubBiz: () => void;
+    let unsubBookings: () => void;
+
+    const setupListeners = async () => {
       try {
-        // 1. Get business ID
         const bQuery = query(collection(db, 'businesses'), where('owner_id', '==', user.uid));
-        const bSnap = await getDocs(bQuery);
-        if (bSnap.empty) { 
-          setLoading(false); 
-          return; 
-        }
-        const bizId = bSnap.docs[0].id;
+        unsubBiz = onSnapshot(bQuery, (bSnap) => {
+          if (bSnap.empty) {
+            setLoading(false);
+            return;
+          }
+          const bizId = bSnap.docs[0].id;
 
-        // 2. Get bookings for this business
-        const bksQuery = query(collection(db, 'bookings'), where('business_id', '==', bizId));
-        const bksSnap = await getDocs(bksQuery);
-        const bks = bksSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          const bksQuery = query(collection(db, 'bookings'), where('business_id', '==', bizId));
+          unsubBookings = onSnapshot(bksQuery, (bksSnap) => {
+            const bks = bksSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
-        // 3. Simple calc (MVP)
-        const revenue = bks.filter(b => b.status === 'completed').reduce((sum, b) => sum + (b.price || 0), 0);
-        
-        setStats({
-          totalRevenue: revenue,
-          totalBookings: bks.length,
-          newCustomers: Array.from(new Set(bks.map(b => b.user_id))).length,
-          conversionRate: bks.length > 0 ? (bks.filter(b => b.status === 'completed').length / bks.length) * 100 : 0
+            // Stats
+            const revenue = bks.filter(b => b.status === 'completed').reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+            setStats({
+              totalRevenue: revenue,
+              totalBookings: bks.length,
+              newCustomers: Array.from(new Set(bks.map(b => b.user_id))).length,
+              conversionRate: bks.length > 0 ? (bks.filter(b => b.status === 'completed').length / bks.length) * 100 : 0
+            });
+
+            // Weekly Chart
+            const last7Days = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - (6 - i));
+              d.setHours(0, 0, 0, 0);
+              return d;
+            });
+
+            const dailyRev = last7Days.map(date => {
+              const nextDay = new Date(date);
+              nextDay.setDate(nextDay.getDate() + 1);
+
+              return bks
+                .filter(b => b.status === 'completed' && b.date)
+                .filter(b => {
+                  const bDate = new Date(b.date);
+                  return bDate >= date && bDate < nextDay;
+                })
+                .reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+            });
+
+            setChartData(dailyRev);
+            setLoading(false);
+          });
         });
-
-        // 4. Chart data (Last 7 days)
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (6 - i));
-          d.setHours(0, 0, 0, 0);
-          return d;
-        });
-
-        const dailyRev = last7Days.map(date => {
-          const nextDay = new Date(date);
-          nextDay.setDate(nextDay.getDate() + 1);
-          
-          return bks
-            .filter(b => b.status === 'completed' && b.date)
-            .filter(b => {
-              const bDate = new Date(b.date);
-              return bDate >= date && bDate < nextDay;
-            })
-            .reduce((sum, b) => sum + (b.price || 0), 0);
-        });
-
-        // If no revenue, show some demo growth pattern or flat zeroes
-        setChartData(dailyRev.some(r => r > 0) ? dailyRev : [30, 45, 35, 60, 55, 80, 75]);
-
       } catch (err) {
-        console.error('Analysis error:', err);
-      } finally {
+        console.error('Analysis listener error:', err);
         setLoading(false);
       }
     };
 
-    fetchAnalysis();
+    setupListeners();
+    return () => {
+      if (unsubBiz) unsubBiz();
+      if (unsubBookings) unsubBookings();
+    };
   }, [user]);
 
   if (loading) {
