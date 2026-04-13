@@ -3,7 +3,7 @@ import { BarChart2, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight,
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import type { NavState, Booking } from '../lib/types';
+import type { NavState } from '../lib/types';
 
 interface AdminAnalysisProps {
   onNavigate: (state: NavState) => void;
