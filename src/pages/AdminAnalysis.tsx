@@ -113,14 +113,14 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
   ];
 
   return (
-    <div className="pt-28 pb-12">
-      <div className="mb-10 flex items-center justify-between bg-white p-8 rounded-[32px] border border-[#E6EAF0] shadow-sm">
-        <div>
-          <h1 className="text-4xl font-black text-[#0F172A] tracking-tighter">Performance Analysis</h1>
-          <p className="text-[#6B7280] text-sm font-medium mt-1">Real-time data insights for your business</p>
+    <div className="pt-24 pb-12 md:pt-28">
+      <div className="mb-6 flex items-center justify-between bg-white p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#E6EAF0] shadow-sm">
+        <div className="pr-4">
+          <h1 className="text-2xl md:text-4xl font-black text-[#0F172A] tracking-tighter leading-tight">Performance Analysis</h1>
+          <p className="text-[#6B7280] text-xs md:text-sm font-medium mt-1">Real-time insights for your business</p>
         </div>
-        <div className="w-14 h-14 bg-gradient-to-br from-[#3A6FF8] to-[#1E40AF] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-           <BarChart2 size={24} />
+        <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-[#3A6FF8] to-[#1E40AF] rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200 shrink-0">
+           <BarChart2 size={20} className="md:w-6 md:h-6" />
         </div>
       </div>
 
@@ -145,12 +145,12 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
            <h3 className="text-xl font-black text-[#0F172A] mb-6 flex items-center gap-2">
              <TrendingUp size={20} className="text-[#3A6FF8]" /> Revenue Forecast
            </h3>
-           <div className="h-64 flex items-end justify-between gap-2 pt-4">
+           <div className="h-64 flex items-end justify-start md:justify-between gap-4 pt-4 overflow-x-auto pb-6 hide-scrollbar">
               {chartData.map((val, i) => {
                 const maxVal = Math.max(...chartData, 1);
                 const heightPercent = (val / maxVal) * 100;
                 return (
-                  <div key={i} className="flex-1 h-full flex flex-col justify-end items-center gap-3 group">
+                  <div key={i} className="min-w-[70px] md:min-w-0 md:flex-1 h-full flex flex-col justify-end items-center gap-3 group shrink-0">
                      {/* Value tooltip on hover */}
                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-[#0F172A] text-white text-[9px] px-2 py-1 rounded mb-1">
                         ₹{val}
@@ -161,7 +161,7 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
                      >
                        <div className="absolute bottom-0 left-0 right-0 bg-[#3A6FF8] transition-all duration-1000" style={{ height: '70%' }} />
                      </div>
-                     <span className="text-[10px] font-black text-[#9AA4B2] uppercase">Day {i+1}</span>
+                     <span className="text-[10px] font-black text-[#9AA4B2] uppercase whitespace-nowrap">Day {i+1}</span>
                   </div>
                 );
               })}
