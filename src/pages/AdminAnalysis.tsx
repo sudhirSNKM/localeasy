@@ -18,7 +18,7 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
     conversionRate: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState<number[]>([]);
+  const [chartData, setChartData] = useState<number[]>([30, 45, 35, 60, 55, 80, 75]);
 
   useEffect(() => {
     if (!user) return;
@@ -28,7 +28,10 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
         // 1. Get business ID
         const bQuery = query(collection(db, 'businesses'), where('owner_id', '==', user.uid));
         const bSnap = await getDocs(bQuery);
-        if (bSnap.empty) { setLoading(false); return; }
+        if (bSnap.empty) { 
+          setLoading(false); 
+          return; 
+        }
         const bizId = bSnap.docs[0].id;
 
         // 2. Get bookings for this business
