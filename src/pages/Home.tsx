@@ -66,22 +66,22 @@ export default function Home({ onNavigate }: HomeProps) {
   }, [loading, businesses, promotions]);
 
   return (
-    <div className="pt-28 pb-10">
+    <div className="pt-24 pb-20 md:pt-28">
       
       {/* 1. Header (Dynamic Grid Feel) */}
-      <div className="mb-12">
+      <div className="mb-8">
         <h1 className="text-4xl md:text-5xl font-black text-[#0F172A] mb-3 tracking-tighter">Discover. Book. <span className="text-[#3A6FF8]">Done.</span></h1>
         <p className="text-lg text-[#6B7280] font-medium">Find the best local services near you</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
         {/* LEFT COLUMN (Main Content) */}
-        <div className="lg:col-span-2 space-y-10">
+        <div className="lg:col-span-2 space-y-8">
           
           {/* 2. Categories Grid */}
           <section>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
                <h3 className="font-bold text-lg text-[#0F172A] tracking-tight">Browse Categories</h3>
                <button onClick={() => onNavigate({ page: 'browse' })} className="text-xs font-bold text-[#3A6FF8] uppercase">View All</button>
             </div>
@@ -182,7 +182,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
           {/* 4. Recommended Section */}
           <section>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg text-[#0F172A] tracking-tight">Recommended Services</h3>
               <button onClick={() => onNavigate({ page: 'browse' })} className="text-xs font-bold text-[#3A6FF8] uppercase">Explore More</button>
             </div>

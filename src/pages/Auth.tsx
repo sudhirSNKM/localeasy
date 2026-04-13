@@ -55,8 +55,8 @@ export default function Auth({ onNavigate }: AuthProps) {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400 rounded-full translate-y-1/2 -translate-x-1/2" />
         </div>
         <div className="relative text-center text-white">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <MapPin size={32} className="text-white" />
+          <div className="w-20 h-20 rounded-2xl overflow-hidden mx-auto mb-6 shadow-2xl shadow-blue-900/20">
+            <img src="/logo.png" className="w-full h-full object-cover" alt="LocalEase Logo" />
           </div>
           <h2 className="text-3xl font-bold mb-4">LocalEase</h2>
           <p className="text-blue-200 text-lg leading-relaxed max-w-sm">
@@ -78,8 +78,8 @@ export default function Auth({ onNavigate }: AuthProps) {
         <div className="w-full max-w-md">
           <div className="lg:hidden flex justify-center mb-8">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                <MapPin size={20} className="text-white" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-200">
+                <img src="/logo.png" className="w-full h-full object-cover" alt="LocalEase Logo" />
               </div>
               <span className="text-2xl font-bold text-gray-900">Local<span className="text-blue-600">Ease</span></span>
             </div>
@@ -185,24 +185,41 @@ export default function Auth({ onNavigate }: AuthProps) {
               {mode === 'register' && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Account Type</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     {[
-                      { value: 'user' as const, icon: <User size={18} />, label: 'Customer', desc: 'Browse & book services' },
-                      { value: 'admin' as const, icon: <Building2 size={18} />, label: 'Business Owner', desc: 'List & manage your business' },
+                      { value: 'user' as const, icon: <User size={20} />, label: 'Customer', desc: 'Browse & book services' },
+                      { value: 'admin' as const, icon: <Building2 size={20} />, label: 'Business Owner', desc: 'Manage your business' },
                     ].map(opt => (
                       <button
                         key={opt.value}
                         type="button"
                         onClick={() => setRole(opt.value)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col h-full relative group ${
                           role === opt.value
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-blue-600 bg-blue-50/50 shadow-sm shadow-blue-100'
+                            : 'border-gray-100 bg-white hover:border-blue-200 hover:bg-gray-50'
                         }`}
                       >
-                        <div className={`mb-1 ${role === opt.value ? 'text-blue-600' : 'text-gray-500'}`}>{opt.icon}</div>
-                        <div className="font-bold text-gray-900 text-sm">{opt.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-all ${
+                          role === opt.value 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600'
+                        }`}>
+                          {opt.icon}
+                        </div>
+                        <div className="font-bold text-gray-900 text-sm leading-tight flex-grow mb-1">
+                          {opt.label}
+                        </div>
+                        <div className="text-[11px] leading-relaxed text-gray-500">
+                          {opt.desc}
+                        </div>
+                        {role === opt.value && (
+                          <div className="absolute top-3 right-3">
+                            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                              <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                            </div>
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>

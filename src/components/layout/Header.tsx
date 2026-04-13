@@ -57,8 +57,8 @@ export default function Header({ nav, onNavigate }: HeaderProps) {
 
           {/* Logo */}
           <button onClick={() => onNavigate({ page: 'home' })} className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            <div className="w-10 h-10 bg-[#3A6FF8] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <MapPin size={22} className="text-white" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-200">
+              <img src="/logo.png" className="w-full h-full object-cover" alt="LocalEase Logo" />
             </div>
             <span className="text-2xl font-black text-[#0F172A] tracking-tighter">Local<span className="text-[#3A6FF8]">Ease</span></span>
           </button>
