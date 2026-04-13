@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, ChevronRight, History, Star, ArrowRight } from 'lucide-react';
+import { Calendar, Clock, ChevronRight, History, Star, ArrowRight } from 'lucide-react';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,7 +122,7 @@ export default function UserBookings({ onNavigate }: UserBookingsProps) {
                   {recentlyViewed.map(biz => (
                     <div 
                       key={biz.id} 
-                      onClick={() => onNavigate({ page: 'business-profile', businessId: biz.id })}
+                      onClick={() => onNavigate({ page: 'business-detail', businessId: biz.id })}
                       className="flex items-center gap-4 cursor-pointer group"
                     >
                       <img src={biz.logo_url} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-[#E6EAF0]" alt="" />

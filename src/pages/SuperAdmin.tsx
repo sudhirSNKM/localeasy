@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Building2, Users, Database, Search, CheckCircle, XCircle, AlertCircle, ShieldCheck, Clock } from 'lucide-react';
+import { Building2, Users, Search, CheckCircle, XCircle, ShieldCheck, Clock } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import type { Business, Profile, NavState } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/ui/Button';
@@ -22,8 +22,6 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
-  const [seedMsg, setSeedMsg] = useState('');
 
   useEffect(() => {
     if (profile && profile.role !== 'super_admin') {

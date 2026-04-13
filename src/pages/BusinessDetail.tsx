@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, MessageSquare, Star, Clock, Info, ShieldCheck, Heart, Share2, ArrowLeft, ChevronRight, Calendar, IndianRupee } from 'lucide-react';
+import { MapPin, Phone, MessageSquare, Star, Clock, ShieldCheck, Heart, Share2, ArrowLeft, Calendar } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { dataService } from '../lib/dataService';
 import type { BusinessWithCategory, Service, Promotion, NavState } from '../lib/types';
 import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
+// import Badge from '../components/ui/Badge';
 
 interface BusinessDetailProps {
   businessId: string;

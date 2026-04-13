@@ -86,7 +86,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           phone: bizData.phone || '',
           whatsapp: bizData.whatsapp || '',
           logo_url: bizData.logo_url || '',
-          cover_url: bizData.cover_url || ''
+          cover_url: bizData.cover_url || '',
+          working_hours: bizData.working_hours || bizForm.working_hours
         });
         setLoading(false);
 

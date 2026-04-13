@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Star, MapPin, ArrowRight, Sparkles, Calendar } from 'lucide-react';
+import { Star, MapPin, ArrowRight, Sparkles } from 'lucide-react';
 import { dataService } from '../lib/dataService';
 import type { BusinessWithCategory, Category, Promotion, NavState } from '../lib/types';
 

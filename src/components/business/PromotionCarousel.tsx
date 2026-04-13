@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, Tag, ArrowRight } from 'lucide-react';
 import type { Promotion } from '../../lib/types';
-import Button from '../ui/Button';
+// import Button from '../ui/Button';
 
 interface PromotionCarouselProps {
   promotions: Promotion[];

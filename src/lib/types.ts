@@ -5,7 +5,10 @@ export type Category = Database['public']['Tables']['categories']['Row'];
 export type Business = Database['public']['Tables']['businesses']['Row'];
 export type Service = Database['public']['Tables']['services']['Row'];
 export type Booking = Database['public']['Tables']['bookings']['Row'];
-export type Promotion = Database['public']['Tables']['promotions']['Row'];
+export type Promotion = Database['public']['Tables']['promotions']['Row'] & {
+  business_name?: string;
+  business_whatsapp?: string;
+};
 
 export type UserRole = 'user' | 'admin' | 'super_admin';
 export type BusinessStatus = 'pending' | 'approved' | 'rejected';
@@ -21,6 +24,7 @@ export type Page =
   | 'admin-dashboard'
   | 'super-admin'
   | 'admin-analysis'
+  | 'user-bookings'
   | 'profile';
 
 export interface NavState {

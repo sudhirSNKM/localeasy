@@ -55,6 +55,7 @@ export interface Database {
           rating: number;
           review_count: number;
           created_at: string;
+          working_hours?: any;
         };
         Insert: {
           owner_id: string;
@@ -68,6 +69,7 @@ export interface Database {
           logo_url?: string;
           cover_url?: string;
           status?: 'pending' | 'approved' | 'rejected';
+          working_hours?: any;
         };
         Update: {
           name?: string;
@@ -80,6 +82,7 @@ export interface Database {
           logo_url?: string;
           cover_url?: string;
           status?: 'pending' | 'approved' | 'rejected';
+          working_hours?: any;
         };
       };
       services: {

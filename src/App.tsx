@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import type { NavState } from './lib/types';
 import Header from './components/layout/Header';
-import Footer from './components/layout/Footer';
+// import Footer from './components/layout/Footer';
 import Home from './pages/Home';
 import Browse from './pages/Browse';
 import BusinessDetail from './pages/BusinessDetail';
@@ -103,7 +103,7 @@ function AppContent() {
     }
   };
 
-  const showHeader = true; // Header present in every page
+  // const showHeader = true; // Header present in every page
   const showBottomNav = nav.page !== 'auth' && nav.page !== 'booking';
 
   return (
