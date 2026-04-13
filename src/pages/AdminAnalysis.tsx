@@ -3,13 +3,13 @@ import { BarChart2, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight,
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import type { NavState, Business, Booking } from '../lib/types';
+import type { NavState, Booking } from '../lib/types';
 
 interface AdminAnalysisProps {
   onNavigate: (state: NavState) => void;
 }
 
-export default function AdminAnalysis({ onNavigate }: AdminAnalysisProps) {
+export default function AdminAnalysis({}: AdminAnalysisProps) {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -34,7 +34,7 @@ export default function AdminAnalysis({ onNavigate }: AdminAnalysisProps) {
         // 2. Get bookings for this business
         const bksQuery = query(collection(db, 'bookings'), where('business_id', '==', bizId));
         const bksSnap = await getDocs(bksQuery);
-        const bks = bksSnap.docs.map(d => d.data() as Booking);
+        const bks = bksSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
         // 3. Simple calc (MVP)
         const revenue = bks.filter(b => b.status === 'completed').reduce((sum, b) => sum + (b.price || 0), 0);
