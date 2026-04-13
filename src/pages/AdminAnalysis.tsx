@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { BarChart2, TrendingUp, Users, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, Sparkles, Clock } from 'lucide-react';
+import { BarChart2, TrendingUp, Users, DollarSign, Calendar, Sparkles, Clock } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import type { NavState } from '../lib/types';
 
@@ -29,7 +29,7 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
     const setupListeners = async () => {
       try {
         const bQuery = query(collection(db, 'businesses'), where('owner_id', '==', user.uid));
-        unsubBiz = onSnapshot(bQuery, (bSnap) => {
+        unsubBiz = onSnapshot(bQuery, (bSnap: any) => {
           if (bSnap.empty) {
             setLoading(false);
             return;
@@ -37,16 +37,27 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
           const bizId = bSnap.docs[0].id;
 
           const bksQuery = query(collection(db, 'bookings'), where('business_id', '==', bizId));
-          unsubBookings = onSnapshot(bksQuery, (bksSnap) => {
-            const bks = bksSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+          unsubBookings = onSnapshot(bksQuery, async (bksSnap: any) => {
+            const bks = bksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+
+            // Fetch services to get prices
+            const sQuery = query(collection(db, 'services'), where('business_id', '==', bizId));
+            const sSnap = await getDocs(sQuery);
+            const servicePriceMap: Record<string, number> = {};
+            sSnap.docs.forEach((d: any) => {
+              servicePriceMap[d.id] = d.data().price || 0;
+            });
 
             // Stats
-            const revenue = bks.filter(b => b.status === 'completed').reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+            const revenue = bks
+              .filter((b: any) => b.status === 'completed')
+              .reduce((sum: number, b: any) => sum + (servicePriceMap[b.service_id] || 0), 0);
+              
             setStats({
               totalRevenue: revenue,
               totalBookings: bks.length,
-              newCustomers: Array.from(new Set(bks.map(b => b.user_id))).length,
-              conversionRate: bks.length > 0 ? (bks.filter(b => b.status === 'completed').length / bks.length) * 100 : 0
+              newCustomers: Array.from(new Set(bks.map((b: any) => b.user_id))).length,
+              conversionRate: bks.length > 0 ? (bks.filter((b: any) => b.status === 'completed').length / bks.length) * 100 : 0
             });
 
             // Weekly Chart
@@ -62,12 +73,12 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
               nextDay.setDate(nextDay.getDate() + 1);
 
               return bks
-                .filter(b => b.status === 'completed' && b.date)
-                .filter(b => {
+                .filter((b: any) => b.status === 'completed' && b.date)
+                .filter((b: any) => {
                   const bDate = new Date(b.date);
                   return bDate >= date && bDate < nextDay;
                 })
-                .reduce((sum, b) => sum + (Number(b.price) || 0), 0);
+                .reduce((sum: number, b: any) => sum + (servicePriceMap[b.service_id] || 0), 0);
             });
 
             setChartData(dailyRev);
@@ -96,10 +107,10 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
   }
 
   const cards = [
-    { label: 'Total Revenue', value: `₹${stats.totalRevenue}`, icon: <DollarSign size={20} />, trend: '+12.5%', isUp: true, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Total Bookings', value: stats.totalBookings, icon: <Calendar size={20} />, trend: '+8.2%', isUp: true, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Unique Customers', value: stats.newCustomers, icon: <Users size={20} />, trend: '+4.1%', isUp: true, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Completion Rate', value: `${stats.conversionRate.toFixed(1)}%`, icon: <TrendingUp size={20} />, trend: '-1.4%', isUp: false, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Total Revenue', value: `₹${stats.totalRevenue}`, icon: <DollarSign size={20} />, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Total Bookings', value: stats.totalBookings, icon: <Calendar size={20} />, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Unique Customers', value: stats.newCustomers, icon: <Users size={20} />, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Completion Rate', value: `${stats.conversionRate.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   return (
@@ -123,10 +134,6 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
             <div className="text-3xl font-black text-[#0F172A] mb-1">{card.value}</div>
             <div className="flex items-center justify-between">
                <span className="text-xs font-bold text-[#9AA4B2] uppercase tracking-widest">{card.label}</span>
-               <div className={`flex items-center text-[10px] font-black px-2 py-1 rounded-lg ${card.isUp ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                 {card.isUp ? <ArrowUpRight size={10} className="mr-1" /> : <ArrowDownRight size={10} className="mr-1" />}
-                 {card.trend}
-               </div>
             </div>
             {/* Background design */}
             <div className="absolute top-0 right-0 w-16 h-16 bg-gray-50 rounded-bl-[100px] opacity-20 -mr-4 -mt-4" />
@@ -163,8 +170,8 @@ export default function AdminAnalysis({}: AdminAnalysisProps) {
         </div>
 
         <div className="bg-[#0F172A] rounded-[32px] p-8 text-white shadow-xl shadow-gray-200">
-           <h3 className="text-xl font-black mb-2">Growth Tip</h3>
-           <p className="text-sm text-gray-400 mb-8 leading-relaxed">Based on your recent completed bookings, your business is growing at a steady pace.</p>
+           <h3 className="text-xl font-black mb-2">Insights</h3>
+           <p className="text-sm text-gray-400 mb-8 leading-relaxed">Optimization strategies based on your database trends.</p>
            
            <div className="space-y-6">
               <div className="flex items-start gap-4">
