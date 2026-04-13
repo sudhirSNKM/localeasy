@@ -148,18 +148,23 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
         {/* BUSINESSES TAB */}
         {tab === 'businesses' && (
           <div>
-            <div className="flex gap-2 mb-5 flex-wrap">
-              {['pending', 'approved', 'rejected', 'all'].map(s => (
+            <div className="grid grid-cols-4 gap-2 mb-6">
+              {['pending', 'rejected', 'approved', 'all'].map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-[10px] font-bold tracking-tight transition-all border ${
                     statusFilter === s
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
+                      ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-md'
+                      : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
                   }`}
                 >
-                  {s} ({s === 'all' ? businesses.length : businesses.filter(b => b.status === s).length})
+                  <span className="mb-0.5">
+                    {s === 'rejected' ? 'PROVE' : s === 'approved' ? 'APPROVE' : s.toUpperCase()}
+                  </span>
+                  <span className={`text-[9px] ${statusFilter === s ? 'text-gray-400' : 'text-gray-300'}`}>
+                    ({s === 'all' ? businesses.length : businesses.filter(b => b.status === s).length})
+                  </span>
                 </button>
               ))}
             </div>
@@ -180,42 +185,57 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
             ) : (
               <div className="space-y-3">
                 {filteredBiz.map(biz => (
-                  <div key={biz.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col md:flex-row md:items-center gap-5 border border-gray-100 hover:border-blue-100 transition-colors">
-                    <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
-                      <img
-                        src={biz.logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.name)}&background=3b82f6&color=fff`}
-                        className="w-full h-full object-cover"
-                        alt={biz.name}
-                        onError={e => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.name)}&background=3b82f6&color=fff`; }}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-base font-bold text-gray-900">{biz.name}</h3>
-                        <Badge variant={biz.status === 'approved' ? 'success' : biz.status === 'rejected' ? 'error' : 'warning'}>
-                          {biz.status}
-                        </Badge>
+                  <div key={biz.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-blue-100 transition-all group overflow-hidden">
+                    <div className="p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4">
+                      {/* Business Logo & Basic Info */}
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50 border border-gray-100">
+                          <img
+                            src={biz.logo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.name)}&background=3b82f6&color=fff`}
+                            className="w-full h-full object-cover"
+                            alt={biz.name}
+                            onError={e => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.name)}&background=3b82f6&color=fff`; }}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h3 className="text-base font-bold text-gray-900 truncate">{biz.name}</h3>
+                            <Badge variant={biz.status === 'approved' ? 'success' : biz.status === 'rejected' ? 'error' : 'warning'} className="text-[10px] px-1.5 py-0">
+                              {biz.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-gray-400">
+                            <span className="flex items-center gap-1">📍 {biz.city}</span>
+                            <span className="flex items-center gap-1">⭐ {biz.rating}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
-                        <span>📍 {biz.city}</span>
-                        <span>👤 Owner: {biz.owner_id.substring(0, 10)}...</span>
-                        <span>⭐ {biz.rating}</span>
+
+                      {/* Desktop Only: Owner Info */}
+                      <div className="hidden lg:block text-[11px] text-gray-400 max-w-[150px]">
+                        <div className="font-medium text-gray-500 mb-0.5">Owner ID</div>
+                        <div className="truncate font-mono">{biz.owner_id}</div>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1 truncate max-w-lg">{biz.description}</p>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 pt-3 md:pt-0 border-t md:border-t-0 border-gray-50">
+                        {biz.status === 'pending' && (
+                          <>
+                            <Button size="sm" className="flex-1 md:flex-none" onClick={() => updateBizStatus(biz.id, 'approved')} loading={updating === biz.id}>Approve</Button>
+                            <Button size="sm" variant="danger" className="flex-1 md:flex-none" onClick={() => updateBizStatus(biz.id, 'rejected')} loading={updating === biz.id}>Reject</Button>
+                          </>
+                        )}
+                        {biz.status === 'approved' && (
+                          <Button size="sm" variant="danger" className="w-full md:w-auto" onClick={() => updateBizStatus(biz.id, 'rejected')} loading={updating === biz.id}>Revoke</Button>
+                        )}
+                        {biz.status === 'rejected' && (
+                          <Button size="sm" className="w-full md:w-auto" onClick={() => updateBizStatus(biz.id, 'approved')} loading={updating === biz.id}>Re-approve</Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {biz.status === 'pending' && (
-                        <>
-                          <Button size="sm" onClick={() => updateBizStatus(biz.id, 'approved')} loading={updating === biz.id}>Approve</Button>
-                          <Button size="sm" variant="danger" onClick={() => updateBizStatus(biz.id, 'rejected')} loading={updating === biz.id}>Reject</Button>
-                        </>
-                      )}
-                      {biz.status === 'approved' && (
-                        <Button size="sm" variant="danger" onClick={() => updateBizStatus(biz.id, 'rejected')} loading={updating === biz.id}>Revoke</Button>
-                      )}
-                      {biz.status === 'rejected' && (
-                        <Button size="sm" onClick={() => updateBizStatus(biz.id, 'approved')} loading={updating === biz.id}>Re-approve</Button>
-                      )}
+                    {/* Description - Bottom strip on mobile, hidden or tooltip on large? Let's show it subtly */}
+                    <div className="px-4 pb-4 md:px-5 md:pb-5">
+                       <p className="text-[11px] text-gray-400 line-clamp-1">{biz.description}</p>
                     </div>
                   </div>
                 ))}
@@ -228,17 +248,22 @@ export default function SuperAdmin({ onNavigate }: SuperAdminProps) {
         {tab === 'users' && (
           <div className="space-y-3">
             {users.filter(u => search ? u.full_name.toLowerCase().includes(search.toLowerCase()) : true).map(u => (
-              <div key={u.id} className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4 border border-gray-100">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
+              <div key={u.id} className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4 border border-gray-100 hover:border-blue-50 transition-colors">
+                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-bold text-lg border border-blue-100">
                   {u.full_name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900">{u.full_name}</div>
-                  <div className="text-xs text-gray-400">ID: {u.id.substring(0, 16)}...</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <div className="font-bold text-gray-900 truncate">{u.full_name}</div>
+                    <Badge variant={u.role === 'super_admin' ? 'accent' : u.role === 'admin' ? 'info' : 'default'} className="text-[10px] px-1.5 py-0">
+                       {u.role}
+                    </Badge>
+                  </div>
+                  <div className="text-[10px] text-gray-400 font-mono truncate">ID: {u.id}</div>
                 </div>
-                <Badge variant={u.role === 'super_admin' ? 'accent' : u.role === 'admin' ? 'info' : 'default'}>
-                  {u.role}
-                </Badge>
+                <div className="hidden sm:block">
+                   <Button size="sm" variant="secondary" className="text-[10px] h-8">View Details</Button>
+                </div>
               </div>
             ))}
             {users.length === 0 && (
